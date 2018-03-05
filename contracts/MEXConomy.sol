@@ -49,6 +49,28 @@ contract MEXConomy is CanReclaimToken {
     feesCollected = 0;
   }
 
+  // main exported functions
+  function release(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint16 _fee) external returns (bool){
+    require(msg.sender == _seller);
+    return doReleaseEscrow(_tradeID, _seller, _buyer, _value, _fee);
+  }
+  function disableSellerCancel(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint16 _fee) external returns (bool) {
+    require(msg.sender == _buyer);
+    return doDisableSellerToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
+  }
+  function buyerCancel(bytes16 _tradeID, address _seller, address _buyer, uint256 _value, uint16 _fee) external returns (bool) {
+    require(msg.sender == _buyer);
+    return doBuyerToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
+  }
+  function sellerCancel(bytes16 _tradeID, address _seller, address _buyer, uint256 _value, uint16 _fee) external returns (bool) {
+    require(msg.sender == _seller);
+    return doSellerToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
+  }
+  function sellerRequestCancel(bytes16 _tradeID, address _seller, address _buyer, uint256 _value, uint16 _fee) external returns (bool) {
+    require(msg.sender == _seller);
+    return doSellerRequestToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
+  }
+
   function withdrawFees(address _to, uint256 _amount) onlyOwner external {
     /**
      * Withdraw fees collected by the contract. Only the owner can call this.
@@ -100,7 +122,7 @@ contract MEXConomy is CanReclaimToken {
     Created(tradeHash);
   }  
 
-  function releaseEscrow(
+  function doReleaseEscrow(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
@@ -115,7 +137,7 @@ contract MEXConomy is CanReclaimToken {
     return true;
   }  
 
-  function disableSellerToCancelTrade(
+  function doDisableSellerToCancelTrade(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
@@ -131,7 +153,7 @@ contract MEXConomy is CanReclaimToken {
     return true;
   }  
   
-  function buyerToCancelTrade(
+  function doBuyerToCancelTrade(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
@@ -150,7 +172,7 @@ contract MEXConomy is CanReclaimToken {
     return true;
   }  
 
-  function sellerToCancelTrade(
+  function doSellerToCancelTrade(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
@@ -177,7 +199,7 @@ contract MEXConomy is CanReclaimToken {
    * from the buyer when the cancellation time is set to unlimited.
    *
    */
-  function sellerRequestToCancelTrade(
+  function doSellerRequestToCancelTrade(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
