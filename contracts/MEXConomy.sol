@@ -14,13 +14,6 @@ contract MEXConomy is CanReclaimToken {
   uint32  public cancellationMinimumTime;
   uint256 public feesCollected;
 
-  uint8 constant ACTION_SELLER_CANNOT_CANCEL = 0x01; // Called when marking as paid or calling a dispute as the buyer
-  uint8 constant ACTION_BUYER_CANCEL = 0x02;
-  uint8 constant ACTION_SELLER_CANCEL = 0x03;
-  uint8 constant ACTION_SELLER_REQUEST_CANCEL = 0x04;
-  uint8 constant ACTION_RELEASE = 0x05;
-  uint8 constant ACTION_DISPUTE = 0x06;
-
   // events
   event Created(bytes32 _tradeHash);
   event SellerCancelDisabled(bytes32 _tradeHash);
