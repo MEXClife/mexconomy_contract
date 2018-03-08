@@ -1,12 +1,13 @@
 pragma solidity ^0.4.18;
 
 import 'zeppelin-solidity/contracts/ownership/CanReclaimToken.sol';
+import 'zeppelin-solidity/contracts/lifecycle/Destructible.sol';
 
 /**
  * The MEXConomy contract is the smart contract whereby buyers and
  * sellers conggregate and trade among themeselves using MEXConomy platform.
  */
-contract MEXConomy is CanReclaimToken {
+contract MEXConomy is CanReclaimToken, Destructible {
 
   // variables
   address public arbitrator;
@@ -42,6 +43,21 @@ contract MEXConomy is CanReclaimToken {
     feesCollected = 0;
   }
 
+  // setter and getter functions
+  function changeArbitrator(address _newArbitrator) public onlyOwner {
+    require(_newArbitrator != address(0));
+    arbitrator = _newArbitrator;
+  }
+
+  function changeFeesWallet(address _wallet) public onlyOwner {
+    require(_wallet != address(0));
+    feesWallet = _wallet;
+  }
+
+  function tradeExists(bytes32 _tradeID) public view returns (bool) {
+    return escrows[_tradeID].exists ? true : false;
+  }
+
   // main exported functions
   function release(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint16 _fee) external returns (bool){
     require(msg.sender == _seller);
@@ -73,22 +89,6 @@ contract MEXConomy is CanReclaimToken {
     _to.transfer(_amount);
   }
 
-  function setArbitrator(address _newArbitrator) onlyOwner external {
-    /**
-     * Set the arbitrator to a new address. Only the owner can call this.
-     * @param address _newArbitrator
-     */
-    arbitrator = _newArbitrator;
-  }
-
-  function setOwner(address _newOwner) onlyOwner external {
-    /**
-     * Change the owner to a new address. Only the owner can call this.
-     * @param address _newOwner
-     */
-    owner = _newOwner;
-  }
-
   /**
    * External function to be invoked by another contract where the
    * information shall be supplied.
@@ -101,7 +101,7 @@ contract MEXConomy is CanReclaimToken {
     uint16 _fee,            // fees in ETH
     uint32 _paymentWindow,  // in seconds
     uint32 _expiry          // in seconds for total time.
-  ) payable external {
+  ) payable external returns (bytes32) {
     bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fee);
 
     // do some validation
@@ -113,6 +113,7 @@ contract MEXConomy is CanReclaimToken {
 
     // emit escrow created.
     Created(tradeHash);
+    return tradeHash;
   }  
 
   function doReleaseEscrow(
@@ -159,9 +160,7 @@ contract MEXConomy is CanReclaimToken {
     // delete the escrow record
     delete escrows[tradeHash];
     CancelledByBuyer(tradeHash);
-
     transferMinusFees(_seller, _value, 0);
-
     return true;
   }  
 
