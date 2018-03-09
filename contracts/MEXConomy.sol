@@ -24,6 +24,7 @@ contract MEXConomy is CanReclaimToken, Destructible {
   event CancelledByBuyer(bytes32 _tradeHash);
   event Released(bytes32 _tradeHash);
   event DisputeResolved(bytes32 _tradeHash);
+  event Transfer(address _to, uint256 _value);
   event Fees(uint256 _fees);
 
   // structs
@@ -227,10 +228,15 @@ contract MEXConomy is CanReclaimToken, Destructible {
       uint256 _value, // value in ETH
       uint256 _fees     // fees in ETH
   ) private {
-    _to.transfer(_value.sub(_fees));
+    if (_fees == 0) {
+      _to.transfer(_value);
+      Transfer(_to, _value);
+    } else {
+      uint256 value = _value.sub(_fees);
+      _to.transfer(value);
+      Transfer(_to, value);
 
-    // the are some cases where there's no fees when there's no deal.
-    if (_fees > 0) {
+      // and transfer the fees too
       feesWallet.transfer(_fees);
       Fees(_fees);            
     }
