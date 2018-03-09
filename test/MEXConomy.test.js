@@ -72,11 +72,12 @@ contract('MEXConomy Tests', (accounts) => {
     let tid = tradeId++;
     let resp = await escrow.createEscrow(tid, acc1, acc2, value, fees, expiry, now + expiry, 
                               { from: acc1, value: value });
+    console.log('createEscrow resp:', resp);
     assert.equal(resp.logs[0].event, 'Created', 'Escrow is created');
 
     // and, let's take back the Ether added. Assuming payment has been made.
     resp = await escrow.releaseEscrow(tid, acc1, acc2, value, fees, {from: acc1});
-    console.log('resp:', resp);
+    console.log('releaseEscrow resp:', resp);
     assert.equal(resp.logs[2].event, 'Released', 'Escrow is released');
     assert.equal(resp.logs[1].event, 'Fees', 'Fees are transferred');
     assert.equal(resp.logs[0].event, 'Transfer', 'Ether is transferred to buyer');
@@ -91,13 +92,16 @@ contract('MEXConomy Tests', (accounts) => {
     let tid = tradeId++;
     let resp = await escrow.createEscrow(tid, acc1, acc2, value, fees, expiry, now + expiry, 
                               { from: acc1, value: value });
+    console.log('createEscrow resp:', resp);
     assert.equal(resp.logs[0].event, 'Created', 'Escrow is created');
 
     // and, let's take back the Ether added. Assuming payment has been made.
     resp = await escrow.disableSellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc2});
+    console.log('disableSellerToCancelTrade resp:', resp);
     assert.equal(resp.logs[0].event, 'SellerCancelDisabled', 'Seller cancel is disables');
 
     resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
+    console.log('sellerToCancelTrade resp:', resp);
     assert.equal(resp.logs.length, 0, 'Seller can\'t cancel trade under dispute');
   });
 
@@ -110,18 +114,19 @@ contract('MEXConomy Tests', (accounts) => {
     let tid = tradeId++;
     let resp = await escrow.createEscrow(tid, acc1, acc2, value, fees, expiry, now + expiry, 
                               { from: acc1, value: value });
+    console.log('createEscrow resp:', resp);
     assert.equal(resp.logs[0].event, 'Created', 'Escrow is created');
 
 
     // and, let's take back the Ether added. Assuming payment has been made.
     resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
-    console.log('resp:', resp);    
+    console.log('sellerToCancelTrade resp:', resp);    
     assert.equal(resp.logs.length, 0, 'Seller can\'t cancel the trade yet');
 
     // after 2 hours.
     await increaseTime(expiry + 1);
     resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
-    console.log('resp:', resp);    
+    console.log('sellerToCancelTrade resp:', resp);    
     assert.equal(resp.logs[0].event, 'CancelledBySeller', 'Seller cancelled the trade');
     assert.equal(resp.logs[1].event, 'Transfer', 'Ether is transferred to Seller');        
   });
@@ -135,10 +140,12 @@ contract('MEXConomy Tests', (accounts) => {
     let tid = tradeId++;
     let resp = await escrow.createEscrow(tid, acc1, acc2, value, fees, expiry, now + expiry, 
                               { from: acc1, value: value });
+    console.log('createEscrow resp:', resp);
     assert.equal(resp.logs[0].event, 'Created', 'Escrow is created');
 
     // and, let's take back the Ether added. Assuming payment has been made.
     resp = await escrow.buyerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc2});
+    console.log('buyerToCancelTrade resp:', resp);
     assert.equal(resp.logs[0].event, 'CancelledByBuyer', 'Buyer cancelled the trade');
     assert.equal(resp.logs[1].event, 'Transfer', 'Ether is transferred to Seller');        
   });
@@ -152,23 +159,27 @@ contract('MEXConomy Tests', (accounts) => {
     let tid = tradeId++;
     let resp = await escrow.createEscrow(tid, acc1, acc2, value, fees, 0, now + expiry, 
                               { from: acc1, value: value });
+    console.log('createEscrow resp:', resp);
     assert.equal(resp.logs[0].event, 'Created', 'Escrow is created');
 
 
     // and, let's take back the Ether added. Assuming payment has been made.
     resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
+    console.log('sellerToCancelTrade resp:', resp);
     assert.equal(resp.logs.length, 0, 'Seller can\'t cancel the trade');
 
     resp = await escrow.sellerRequestToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
+    console.log('sellerRequestToCancelTrade resp:', resp);
     assert.equal(resp.logs[0].event, 'SellerRequestedCancel', 'Seller request to cancel trade');
 
     resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
+    console.log('sellerToCancelTrade resp:', resp);
     assert.equal(resp.logs.length, 0, 'Seller can\'t cancel the trade');
 
     // after 2 hours, seller can cancel trade.
     await increaseTime(2 * 60 * 60 * 1000);
     resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
-    console.log('resp:', resp);
+    console.log('sellerToCancelTrade resp:', resp);
     assert.equal(resp.logs[0].event, 'CancelledBySeller', 'Seller cancelled the trade');
     assert.equal(resp.logs[1].event, 'Transfer', 'Ether is transferred to Seller');    
   });
