@@ -1,5 +1,5 @@
 
-// import expectThrow from 'zeppelin-solidity/test/helpers/expectThrow';
+import expectThrow from 'zeppelin-solidity/test/helpers/expectThrow';
 // import assertRevert from 'zeppelin-solidity/test/helpers/assertRevert';
 // import increaseTime from 'zeppelin-solidity/test/helpers/increaseTime';
 
@@ -19,6 +19,26 @@ contract('MEXConomy Tests', (accounts) => {
   beforeEach(async () => {
     escrow = await MEXConomy.deployed();
     now = web3.eth.getBlock(web3.eth.blockNumber).timestamp;
+
+    let feesCollected = await web3.eth.getBalance(acc3);
+    let acc1Bal1 = await web3.eth.getBalance(acc1);
+    let acc2Bal1 = await web3.eth.getBalance(acc2);
+    console.log('');
+    console.log(' ================= begining balance ================= ');    
+    console.log('fees balance:', feesCollected.toString('10'));
+    console.log('acc1 balance:', acc1Bal1.toString('10'));
+    console.log('acc2 balance:', acc2Bal1.toString('10'));    
+  });  
+
+  afterEach(async () => {
+    let feesCollected = await web3.eth.getBalance(acc3);
+    let acc1Bal1 = await web3.eth.getBalance(acc1);
+    let acc2Bal1 = await web3.eth.getBalance(acc2);
+    console.log(' ================= ending balance ================= ');    
+    console.log('fees balance:', feesCollected.toString('10'));
+    console.log('acc1 balance:', acc1Bal1.toString('10'));
+    console.log('acc2 balance:', acc2Bal1.toString('10'));    
+    console.log('');
   });
 
   it('The main addresses should be owner', async () => {
@@ -48,36 +68,54 @@ contract('MEXConomy Tests', (accounts) => {
 
     let expiry = 2 * 60 * 60 * 1000;  // 2 hours
     let tid = tradeId++;
-    // relayer = await MEXCRelayer.deployed(tid, acc1, acc2, value, fees, expiry, now + expiry);
-    let feesCollected = await web3.eth.getBalance(acc3);
-    console.log(' ================= fees balance ================= ');
-    console.log('owner balance:', feesCollected.toString('10'));
-
-    let acc1Bal1 = await web3.eth.getBalance(acc1);
-    let acc2Bal1 = await web3.eth.getBalance(acc2);
-    console.log(' ================= begining balance ================= ');    
-    console.log('acc1 balance:', acc1Bal1.toString('10'));
-    console.log('acc2 balance:', acc2Bal1.toString('10'));
-    console.log('value:', value.toString('10'));
-    console.log('fees:', fees.toString('10'));
-
     await escrow.createEscrow(tid, acc1, acc2, value, fees, expiry, now + expiry, 
                               { from: acc1, value: value });
 
     // and, let's take back the Ether added. Assuming payment has been made.
-    await escrow.release(tid, acc1, acc2, value, fees, {from: acc1});
-    acc1Bal2 = await web3.eth.getBalance(acc1);
-    acc2Bal2 = await web3.eth.getBalance(acc2);
-    console.log(' ================= final balance ================= ');
-    console.log('acc1 balance:', acc1Bal2.toString('10'));
-    console.log('acc2 balance:', acc2Bal2.toString('10'));
-
-    feesCollected = await web3.eth.getBalance(acc3);
-    console.log(' ================= fees balance ================= ');
-    console.log('owner balance:', feesCollected.toString('10'));
-    
+    await escrow.releaseEscrow(tid, acc1, acc2, value, fees, {from: acc1});
   });
 
-  it('', async() => {});
+  it('Should create dispute between acc1 and acc2', async() => {
+    let amt = 1;
+    let fees = web3.toWei(amt * 0.04);
+    let value = web3.toWei(amt * 1.04);
+
+    let expiry = 2 * 60 * 60 * 1000;  // 2 hours
+    let tid = tradeId++;
+    await escrow.createEscrow(tid, acc1, acc2, value, fees, expiry, now + expiry, 
+                              { from: acc1, value: value });
+
+    // and, let's take back the Ether added. Assuming payment has been made.
+    await escrow.disableSellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc2});
+    expectThrow(await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1}));
+  });
+
+  it('Seller cancel the trade', async() => {
+    let amt = 1;
+    let fees = web3.toWei(amt * 0.04);
+    let value = web3.toWei(amt * 1.04);
+
+    let expiry = 2 * 60 * 60 * 1000;  // 2 hours
+    let tid = tradeId++;
+    await escrow.createEscrow(tid, acc1, acc2, value, fees, expiry, now + expiry, 
+                              { from: acc1, value: value });
+
+    // and, let's take back the Ether added. Assuming payment has been made.
+    await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
+  });
+
+  it('Buyer cancel the trade', async() => {
+    let amt = 1;
+    let fees = web3.toWei(amt * 0.04);
+    let value = web3.toWei(amt * 1.04);
+
+    let expiry = 2 * 60 * 60 * 1000;  // 2 hours
+    let tid = tradeId++;
+    await escrow.createEscrow(tid, acc1, acc2, value, fees, expiry, now + expiry, 
+                              { from: acc1, value: value });
+
+    // and, let's take back the Ether added. Assuming payment has been made.
+    await escrow.buyerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc2});
+  });
 
 });

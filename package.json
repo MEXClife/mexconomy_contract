@@ -1,5 +1,5 @@
 {
-  "name": "tutorialtoken",
+  "name": "MEXConomy Smart Contracts",
   "version": "1.0.0",
   "description": "",
   "main": "truffle.js",
@@ -10,12 +10,20 @@
     "dev": "lite-server",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Hisham Ismail <mhishami@gmail.com>",
   "license": "ISC",
   "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-polyfill": "^6.26.0",
+    "babel-preset-es2015": "^6.24.1",
+    "babel-preset-stage-2": "^6.24.1",
+    "babel-preset-stage-3": "^6.24.1",
+    "babel-register": "^6.26.0",
     "lite-server": "^2.3.0"
   },
   "dependencies": {
+    "npm": "^5.7.1",
+    "truffle-hdwallet-provider": "0.0.3",
     "zeppelin-solidity": "^1.7.0"
   }
 }

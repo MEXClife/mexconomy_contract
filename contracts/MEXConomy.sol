@@ -59,23 +59,23 @@ contract MEXConomy is CanReclaimToken, Destructible {
   }
 
   // main exported functions
-  function release(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool){
+  function releaseEscrow(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool){
     require(msg.sender == _seller);
     return doReleaseEscrow(_tradeID, _seller, _buyer, _value, _fee);
   }
-  function disableSellerCancel(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
+  function disableSellerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
     require(msg.sender == _buyer);
     return doDisableSellerToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
   }
-  function buyerCancel(bytes16 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
+  function buyerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
     require(msg.sender == _buyer);
     return doBuyerToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
   }
-  function sellerCancel(bytes16 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
+  function sellerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
     require(msg.sender == _seller);
     return doSellerToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
   }
-  function sellerRequestCancel(bytes16 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
+  function sellerRequestToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
     require(msg.sender == _seller);
     return doSellerRequestToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
   }
