@@ -78,7 +78,7 @@ contract('MEXConomy Tests', (accounts) => {
     resp = await escrow.releaseEscrow(tid, acc1, acc2, value, fees, {from: acc1});
     console.log('resp:', resp);
     assert.equal(resp.logs[1].event, 'Released', 'Escrow is released');
-    assert.equal(resp.logs[0].event, 'Fees', 'Escrow is released');
+    assert.equal(resp.logs[0].event, 'Fees', 'Fees are transferred');
   });
 
   it('Should create dispute between acc1 and acc2', async() => {
@@ -121,7 +121,7 @@ contract('MEXConomy Tests', (accounts) => {
     await increaseTime(expiry + 1);
     resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
     console.log('resp:', resp);    
-    assert.equal(resp.logs[0].event, 'CancelledBySeller', 'Seller cancel is disables');
+    assert.equal(resp.logs[0].event, 'CancelledBySeller', 'Seller cancelled the trade');
   });
 
   it('Buyer cancel the trade', async() => {
@@ -137,7 +137,7 @@ contract('MEXConomy Tests', (accounts) => {
 
     // and, let's take back the Ether added. Assuming payment has been made.
     resp = await escrow.buyerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc2});
-    assert.equal(resp.logs[0].event, 'CancelledByBuyer', 'Seller cancel is disables');
+    assert.equal(resp.logs[0].event, 'CancelledByBuyer', 'Buyer cancelled the trade');
   });
 
   it('Seller to cancel long-running trade', async() => {
@@ -157,7 +157,7 @@ contract('MEXConomy Tests', (accounts) => {
     assert.equal(resp.logs.length, 0, 'Seller can\'t cancel the trade');
 
     resp = await escrow.sellerRequestToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
-    assert.equal(resp.logs[0].event, 'SellerRequestedCancel', 'Seller cancel is disables');
+    assert.equal(resp.logs[0].event, 'SellerRequestedCancel', 'Seller request to cancel trade');
 
     resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
     assert.equal(resp.logs.length, 0, 'Seller can\'t cancel the trade');
