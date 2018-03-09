@@ -228,8 +228,12 @@ contract MEXConomy is CanReclaimToken, Destructible {
       uint256 _fees     // fees in ETH
   ) private {
     _to.transfer(_value.sub(_fees));
-    feesWallet.transfer(_fees);
-    Fees(_fees);      
+
+    // the are some cases where there's no fees when there's no deal.
+    if (_fees > 0) {
+      feesWallet.transfer(_fees);
+      Fees(_fees);            
+    }
   }  
 
 }
