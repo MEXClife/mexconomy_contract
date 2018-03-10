@@ -12,7 +12,6 @@ contract MEXConomy is CanReclaimToken, Destructible {
   using SafeMath for uint256;
 
   // variables
-  address public arbitrator;
   address public feesWallet;
   uint32  public cancellationMinimumTime;
 
@@ -31,23 +30,33 @@ contract MEXConomy is CanReclaimToken, Destructible {
   struct Escrow {
     // Set so we know the trade has already been created
     bool exists;
-    // The timestamp in which the seller can cancel the trade if the buyer has not yet marked as paid. 
+    // The timestamp in which the seller can cancel the trade if the buyer has not yet marked as paid.
     // 0 = marked paid or dispute
     // 1 = unlimited cancel time
     uint32 sellerCanCancelAfter;
   }
   mapping (bytes32 => Escrow) public escrows;
+  mapping (address => bool) public arbitrators;
+
+  modifier onlyArbitrators() {
+    require(arbitrators[msg.sender]);
+    _;
+  }
 
   function MEXConomy () public {
-    arbitrator = msg.sender;
+    arbitrators[msg.sender] = true;
     feesWallet = msg.sender;
-    cancellationMinimumTime = 2 hours;
+    cancellationMinimumTime = 2 hours;  // ample time I think.
   }
 
   // setter and getter functions
-  function changeArbitrator(address _newArbitrator) public onlyOwner {
+  function addArbitrator(address _newArbitrator) public onlyOwner {
     require(_newArbitrator != address(0));
-    arbitrator = _newArbitrator;
+    arbitrators[_newArbitrator] = true;
+  }
+
+  function checkArbitrator(address _addr) public view returns (bool) {
+    return arbitrators[_addr];
   }
 
   function changeFeesWallet(address _wallet) public onlyOwner {
@@ -55,30 +64,35 @@ contract MEXConomy is CanReclaimToken, Destructible {
     feesWallet = _wallet;
   }
 
-  function tradeExists(bytes32 _tradeID) public view returns (bool) {
-    return escrows[_tradeID].exists ? true : false;
+  function changeCancellationMinimumTime(uint32 _cancelTime) public onlyOwner {
+    require (_cancelTime > 1 hours);  // min time.
+    cancellationMinimumTime = _cancelTime;
   }
 
   // main exported functions
-  function releaseEscrow(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool){
+  function releaseEscrow(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees) external returns (bool){
     require(msg.sender == _seller);
-    return doReleaseEscrow(_tradeID, _seller, _buyer, _value, _fee);
+    return doReleaseEscrow(_tradeID, _seller, _buyer, _value, _fees);
   }
-  function disableSellerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
+  function resolveDispute(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees, bool _buyerWins) onlyArbitrators external returns (bool) {
+    return doResolveTradeDispute(_tradeID, _seller, _buyer, _value, _fees, _buyerWins);
+  }
+  function disableSellerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees) external returns (bool) {
+    // have to add arbitrators here, since maybe first time user doesn't have ether balance.
+    require(msg.sender == _buyer || arbitrators[msg.sender]);
+    return doDisableSellerToCancelTrade(_tradeID, _seller, _buyer, _value, _fees);
+  }
+  function buyerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees) external returns (bool) {
     require(msg.sender == _buyer);
-    return doDisableSellerToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
+    return doBuyerToCancelTrade(_tradeID, _seller, _buyer, _value, _fees);
   }
-  function buyerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
-    require(msg.sender == _buyer);
-    return doBuyerToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
-  }
-  function sellerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
+  function sellerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees) external returns (bool) {
     require(msg.sender == _seller);
-    return doSellerToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
+    return doSellerToCancelTrade(_tradeID, _seller, _buyer, _value, _fees);
   }
-  function sellerRequestToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fee) external returns (bool) {
+  function sellerRequestToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees) external returns (bool) {
     require(msg.sender == _seller);
-    return doSellerRequestToCancelTrade(_tradeID, _seller, _buyer, _value, _fee);
+    return doSellerRequestToCancelTrade(_tradeID, _seller, _buyer, _value, _fees);
   }
 
   /**
@@ -90,63 +104,86 @@ contract MEXConomy is CanReclaimToken, Destructible {
     address _seller,        // seller's address
     address _buyer,         // buyer's address
     uint256 _value,         // the value in ETH
-    uint256 _fee,           // fees in ETH
+    uint256 _fees,          // fees in ETH
     uint32 _paymentWindow,  // in seconds
     uint32 _expiry          // in seconds for total time.
   ) payable external returns (bytes32) {
-    bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fee);
+    bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fees);
 
-    // do some validation
+    // do some validations
     require(!escrows[tradeHash].exists);            // tradeHash is new.
     require(block.timestamp < _expiry);             // not yet expired
-    require(msg.value == _value && msg.value > 0);  // eth sent > 0 
+    require(msg.value == _value && msg.value > 0);  // eth sent > 0
     uint32 sellerCanCancelAfter = _paymentWindow == 0 ? 1 : uint32(block.timestamp) + _paymentWindow;
     escrows[tradeHash] = Escrow(true, sellerCanCancelAfter);
 
     // emit escrow created.
     Created(tradeHash);
     return tradeHash;
-  }  
+  }
 
   function doReleaseEscrow(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
     uint256 _value,         // the value in ETH
-    uint256 _fee            // fees in ETH                         
+    uint256 _fees           // fees in ETH
   ) private returns (bool) {
-    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fee);
+    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
     if (!escrow.exists) return false;
-    transferMinusFees(_buyer, _value, _fee);
+    transferMinusFees(_buyer, _value, _fees);
     delete escrows[tradeHash];
     Released(tradeHash);
     return true;
-  }  
+  }
+
+  function doResolveTradeDispute(
+    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
+    address _seller,        // seller's address
+    address _buyer,         // buyer's address
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    bool _buyerWins         // whether the dispute wins by buyer or not.
+  ) private returns (bool) {
+    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
+    if (!escrow.exists) return false;
+
+    // see who won.
+    if (_buyerWins) {
+      transferMinusFees(_buyer, _value, _fees);
+    } else {
+      transferMinusFees(_seller, _value, 0);
+    }
+
+    delete escrows[tradeHash];
+    Released(tradeHash);
+    return true;
+  }
 
   function doDisableSellerToCancelTrade(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
     uint256 _value,         // the value in ETH
-    uint256 _fee            // fees in ETH                         
+    uint256 _fees           // fees in ETH
   ) private returns (bool) {
-    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fee);
+    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
     if (!escrow.exists) return false;
     if (escrow.sellerCanCancelAfter == 0) return false; // already marked under dispute.
 
     escrows[tradeHash].sellerCanCancelAfter = 0;
     SellerCancelDisabled(tradeHash);
     return true;
-  }  
-  
+  }
+
   function doBuyerToCancelTrade(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
     uint256 _value,         // the value in ETH
-    uint256 _fee            // fees in ETH                         
+    uint256 _fees           // fees in ETH
   ) private returns (bool) {
-    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fee);
+    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
     if (!escrow.exists) return false;
 
     // delete the escrow record
@@ -154,16 +191,16 @@ contract MEXConomy is CanReclaimToken, Destructible {
     CancelledByBuyer(tradeHash);
     transferMinusFees(_seller, _value, 0);
     return true;
-  }  
+  }
 
   function doSellerToCancelTrade(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
     uint256 _value,         // the value in ETH
-    uint256 _fee            // fees in ETH                         
+    uint256 _fees           // fees in ETH
   ) private returns (bool) {
-    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fee);
+    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
     if (!escrow.exists) return false;
 
     // time has lapsed, and not unlimited time.
@@ -176,7 +213,7 @@ contract MEXConomy is CanReclaimToken, Destructible {
     transferMinusFees(_seller, _value, 0);
 
     return true;
-  }  
+  }
 
   /**
    * This function is invoked when the seller didn't reveice any confirmation
@@ -188,9 +225,9 @@ contract MEXConomy is CanReclaimToken, Destructible {
     address _seller,        // seller's address
     address _buyer,         // buyer's address
     uint256 _value,         // the value in ETH
-    uint256 _fee            // fees in ETH                         
+    uint256 _fees           // fees in ETH
   ) private returns (bool) {
-    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fee);
+    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
     if (!escrow.exists) return false;
 
     // ensure unlimited time only
@@ -206,7 +243,7 @@ contract MEXConomy is CanReclaimToken, Destructible {
     // and no transfer yet, until buyer confirms it.
     // transferMinusFees(_seller, _value, 0);
     return true;
-  }  
+  }
 
   function getEscrowAndTradeHash(
     /**
@@ -217,11 +254,11 @@ contract MEXConomy is CanReclaimToken, Destructible {
     address _seller,
     address _buyer,
     uint256 _value,
-    uint256 _fee
+    uint256 _fees
   ) view private returns (Escrow, bytes32) {
-    bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fee);
+    bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fees);
     return (escrows[tradeHash], tradeHash);
-  }  
+  }
 
   function transferMinusFees(
       address _to,    // recipient address
@@ -238,8 +275,8 @@ contract MEXConomy is CanReclaimToken, Destructible {
 
       // and transfer the fees too
       feesWallet.transfer(_fees);
-      Fees(_fees);            
+      Fees(_fees);
     }
-  }  
+  }
 
 }
