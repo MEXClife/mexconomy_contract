@@ -6,6 +6,14 @@ can be kept by MEXConomy as people are getting jitter by the day, especially
 when centralized exchangers can be just another 'Mt. Gox' in the making.
 
 # Setup
+
+## Preliminary setup
+```
+$ npm i -g truffle
+$ npm i -g ganache-cli
+```
+
+## Clone the source codes
 ```
 $ git clone https://github.com/MEXClife/mexconomy_contract.git
 $ cd mexconomy_contract
