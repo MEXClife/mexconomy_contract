@@ -160,7 +160,7 @@ contract('MEXConomyTokens Tests', (accounts) => {
           mexc.address, tid, acc1, acc2, value, fees, rate, { from: acc1 });
   });
 
-  it('should reverted back when buyer cancel the trade', async () => {
+  it('should revert back when buyer cancel the trade', async () => {
     let amt = 5;
     let fees = web3.toWei(amt * 0.04, 'ether');
     let value = web3.toWei(amt * 1.04, 'ether');
