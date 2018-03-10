@@ -79,6 +79,16 @@ contract CanReclaimToken is Ownable {
   }
 }
 
+contract HasNoTokens is CanReclaimToken {
+
+  function tokenFallback(address from_, uint256 value_, bytes data_) pure external {
+    from_;
+    value_;
+    data_;
+    revert();
+  }
+
+}
 
 contract Destructible is Ownable {
   function Destructible() public payable { }
@@ -121,7 +131,7 @@ library SafeMath {
  * Special thanks to LocalEthereum for inspiring us to take this further
  * for the community to use.
  */
-contract MEXConomy is CanReclaimToken, Destructible {
+contract MEXConomy is HasNoTokens, Destructible {
   using SafeMath for uint256;
 
   // variables
