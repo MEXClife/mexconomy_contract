@@ -160,4 +160,27 @@ contract('MEXConomyTokens Tests', (accounts) => {
           mexc.address, tid, acc1, acc2, value, fees, rate, { from: acc1 });
   });
 
+  it('should reverted back when buyer cancel the trade', async () => {
+    let amt = 5;
+    let fees = web3.toWei(amt * 0.04, 'ether');
+    let value = web3.toWei(amt * 1.04, 'ether');
+    let expiry = 2 * 60 * 60 * 1000;  // 2 hours
+    let tid = tradeId++;
+    let rate = 2;
+
+    // approve the fund first
+    let resp = await mexc.approve(escrow.address, value, { from: acc1 });
+
+    // create the escrow
+    resp = await escrow.createEscrow(
+          mexc.address, tid, acc1, acc2, value, fees, rate, expiry, now + expiry,
+          { from: acc1, value: value });
+
+    resp = await escrow.buyerToCancelTrade(
+          mexc.address, tid, acc1, acc2, value, fees, rate, { from: acc2 });
+    console.log('buyerToCancelTrade resp: ', resp);
+
+  });
+
+
 });
