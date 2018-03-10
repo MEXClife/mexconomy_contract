@@ -1,11 +1,33 @@
-
+/**
+ *
+ * MIT License
+ *
+ * Copyright (c) 2018, MEXC Program Developers & OpenZeppelin Project.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ */
 import expectThrow from 'zeppelin-solidity/test/helpers/expectThrow';
 // import assertRevert from 'zeppelin-solidity/test/helpers/assertRevert';
 import increaseTime from 'zeppelin-solidity/test/helpers/increaseTime';
 
 var MEXConomy = artifacts.require('./MEXConomy.sol');
-var MEXCRelayer = artifacts.require('./MEXCRelayer.sol');
-var BN = web3.BigNumber;
 
 contract('MEXConomy Tests', (accounts) => {
   // accounts
