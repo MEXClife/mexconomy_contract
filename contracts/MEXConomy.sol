@@ -125,8 +125,8 @@ contract MEXConomy is CanReclaimToken, Destructible {
   using SafeMath for uint256;
 
   // variables
-  address public feesWallet;
-  uint32  public cancellationMinimumTime;
+  address feesWallet_;
+  uint32  cancellationMinimumTime_;
 
   // events
   event Created(bytes32 _tradeHash);
@@ -158,8 +158,12 @@ contract MEXConomy is CanReclaimToken, Destructible {
 
   function MEXConomy () public {
     arbitrators[msg.sender] = true;
-    feesWallet = msg.sender;
-    cancellationMinimumTime = 2 hours;  // ample time I think.
+    feesWallet_ = msg.sender;
+    cancellationMinimumTime_ = 2 hours;  // ample time I think.
+  }
+
+  function feesWallet() public view returns (address) {
+    return feesWallet_;
   }
 
   // setter and getter functions
@@ -174,12 +178,12 @@ contract MEXConomy is CanReclaimToken, Destructible {
 
   function changeFeesWallet(address _wallet) public onlyOwner {
     require(_wallet != address(0));
-    feesWallet = _wallet;
+    feesWallet_ = _wallet;
   }
 
   function changeCancellationMinimumTime(uint32 _cancelTime) public onlyOwner {
     require (_cancelTime > 1 hours);  // min time.
-    cancellationMinimumTime = _cancelTime;
+    cancellationMinimumTime_ = _cancelTime;
   }
 
   // main exported functions
@@ -347,7 +351,7 @@ contract MEXConomy is CanReclaimToken, Destructible {
     if (escrow.sellerCanCancelAfter != 1) return false;
 
     // delete the escrow record
-    escrows[tradeHash].sellerCanCancelAfter = uint32(block.timestamp) + cancellationMinimumTime;
+    escrows[tradeHash].sellerCanCancelAfter = uint32(block.timestamp) + cancellationMinimumTime_;
 
     // we don't delete the escrow yet. The buyer has to do that.
     // delete escrows[tradeHash];
@@ -383,7 +387,7 @@ contract MEXConomy is CanReclaimToken, Destructible {
     Transfer(_to, value);
 
     if (_fees > 0) {
-      feesWallet.transfer(_fees);
+      feesWallet_.transfer(_fees);
       Fees(_fees);
     }
   }
