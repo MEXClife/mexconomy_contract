@@ -2,6 +2,7 @@
  *
  * MIT License
  *
+ * Author: Hisham Ismail <mhishami@gmail.com>
  * Copyright (c) 2018, MEXC Program Developers & OpenZeppelin Project.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -116,7 +117,9 @@ library SafeMath {
 
 /**
  * The MEXConomy contract is the smart contract whereby buyers and
- * sellers conggregate and trade among themeselves using MEXConomy platform.
+ * sellers conggregate and trade among themselves using MEXConomy platform.
+ * Special thanks to LocalEthereum for inspiring us to take this further
+ * for the community to use.
  */
 contract MEXConomy is CanReclaimToken, Destructible {
   using SafeMath for uint256;
@@ -371,19 +374,15 @@ contract MEXConomy is CanReclaimToken, Destructible {
   }
 
   function transferMinusFees(
-      address _to,    // recipient address
-      uint256 _value, // value in ETH
+      address _to,      // recipient address
+      uint256 _value,   // value in ETH
       uint256 _fees     // fees in ETH
   ) private {
-    if (_fees == 0) {
-      _to.transfer(_value);
-      Transfer(_to, _value);
-    } else {
-      uint256 value = _value.sub(_fees);
-      _to.transfer(value);
-      Transfer(_to, value);
+    uint256 value = _value.sub(_fees);  // can be zero fees.
+    _to.transfer(value);
+    Transfer(_to, value);
 
-      // and transfer the fees too
+    if (_fees > 0) {
       feesWallet.transfer(_fees);
       Fees(_fees);
     }

@@ -2,6 +2,7 @@
  *
  * MIT License
  *
+ * Author: Hisham Ismail <mhishami@gmail.com>
  * Copyright (c) 2018, MEXC Program Developers & OpenZeppelin Project.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -216,7 +217,7 @@ contract('MEXConomy Tests', (accounts) => {
     assert.equal(resp.logs[1].event, 'Transfer', 'Ether is transferred to Seller');
   });
 
-  it('Seller to cancel long-running trade', async() => {
+  it('Seller to cancel long-running trade, cancelled by buyer', async() => {
     let amt = 1;
     let fees = web3.toWei(amt * 0.04);
     let value = web3.toWei(amt * 1.04);
@@ -235,19 +236,65 @@ contract('MEXConomy Tests', (accounts) => {
     assert.equal(resp.logs.length, 0, 'Seller can\'t cancel the trade');
 
     resp = await escrow.sellerRequestToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
-    console.log('sellerRequestToCancelTrade resp:', resp);
+    // console.log('sellerRequestToCancelTrade resp:', resp);
     assert.equal(resp.logs[0].event, 'SellerRequestedCancel', 'Seller request to cancel trade');
 
     resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
     // console.log('sellerToCancelTrade resp:', resp);
     assert.equal(resp.logs.length, 0, 'Seller can\'t cancel the trade');
 
-    // after 2 hours, seller can cancel trade.
-    await increaseTime(2 * 60 * 60 * 1000);
+    // 1. Either seller can wait for 2 hours and cancel everything
+    //
+    // await increaseTime(2 * 60 * 60 * 1000);
+    // resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
+    // assert.equal(resp.logs[0].event, 'CancelledBySeller', 'Seller cancelled the trade after 2 hours');
+    // assert.equal(resp.logs[1].event, 'Transfer', 'Ether is transferred to Seller');
+
+    // or, 2. Buyer can cancel right away.
+    resp = await escrow.buyerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc2});
+    // console.log('sellerToCancelTrade resp:', resp);
+    assert.equal(resp.logs[0].event, 'CancelledByBuyer', 'Buyer cancelled the trade immediately');
+    assert.equal(resp.logs[1].event, 'Transfer', 'Ether is transferred to Seller');
+  });
+
+  it('Seller to cancel long-running trade, cancelled by seller', async() => {
+    let amt = 1;
+    let fees = web3.toWei(amt * 0.04);
+    let value = web3.toWei(amt * 1.04);
+
+    let expiry = 30 * 86400;  // 30 days
+    let tid = tradeId++;
+    let resp = await escrow.createEscrow(tid, acc1, acc2, value, fees, 0, now + expiry,
+                              { from: acc1, value: value });
+    // console.log('createEscrow resp:', resp);
+    assert.equal(resp.logs[0].event, 'Created', 'Escrow is created');
+
+
+    // and, let's take back the Ether added. Assuming payment has been made.
     resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
     // console.log('sellerToCancelTrade resp:', resp);
-    assert.equal(resp.logs[0].event, 'CancelledBySeller', 'Seller cancelled the trade');
+    assert.equal(resp.logs.length, 0, 'Seller can\'t cancel the trade');
+
+    resp = await escrow.sellerRequestToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
+    // console.log('sellerRequestToCancelTrade resp:', resp);
+    assert.equal(resp.logs[0].event, 'SellerRequestedCancel', 'Seller request to cancel trade');
+
+    resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
+    // console.log('sellerToCancelTrade resp:', resp);
+    assert.equal(resp.logs.length, 0, 'Seller can\'t cancel the trade');
+
+    // 1. Either seller can wait for 2 hours and cancel everything
+    //
+    await increaseTime(2 * 60 * 60 * 1000);
+    resp = await escrow.sellerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc1});
+    assert.equal(resp.logs[0].event, 'CancelledBySeller', 'Seller cancelled the trade after 2 hours');
     assert.equal(resp.logs[1].event, 'Transfer', 'Ether is transferred to Seller');
+
+    // or, 2. Buyer can cancel right away.
+    // resp = await escrow.buyerToCancelTrade(tid, acc1, acc2, value, fees, {from: acc2});
+    // console.log('sellerToCancelTrade resp:', resp);
+    // assert.equal(resp.logs[0].event, 'CancelledByBuyer', 'Buyer cancelled the trade immediately');
+    // assert.equal(resp.logs[1].event, 'Transfer', 'Ether is transferred to Seller');
   });
 
 });
