@@ -465,7 +465,7 @@ contract MEXConomy is Destructible {
     if (_buyerWins) {
       transferMinusFees(_buyer, _value, _fees, true);
     } else {
-      transferMinusFees(_seller, _value, 0, true);
+      transferMinusFees(_seller, _value, _fees, true);
     }
 
     delete escrows[tradeHash];
@@ -759,7 +759,7 @@ contract MEXConomy is Destructible {
 
     uint256 value = _value.sub(_fees);  // can be zero fees.
 
-    if (_fees != 0) {
+    if (_fees != 0 && !_disputed) {
       // ok, transfer the tokens, and mint MX Tokens
       assert(_token.transfer(feesWallet_, _value));
       Transfer(feesWallet_, _value);
