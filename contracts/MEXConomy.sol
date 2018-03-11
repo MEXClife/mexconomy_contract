@@ -387,10 +387,10 @@ contract MEXConomy is Destructible {
    * This is akin to 'atomic swap'
    */
   function convertTokens(
-    ERC20 _fromToken,     // from token
-    uint8 _fromDecimals,  // decimals for from token
-    ERC20 _toToken,       // to token
-    uint8 _toDecimals,    // decimals for to token
+    ERC20 _fromToken,       // from token
+    uint8 _fromDecimals,    // decimals for from token
+    ERC20 _toToken,         // to token
+    uint8 _toDecimals,      // decimals for to token
     uint256 _value,         // the value in wei
     uint256 _fees,          // fees in wei
     uint256 _rate           // the rate to _toToken in cents
@@ -617,9 +617,9 @@ contract MEXConomy is Destructible {
   }
 
   function transferMinusFees(
-      address _to,      // recipient address
-      uint256 _value,   // value in wei
-      uint256 _fees,    // fees in wei
+      address _to,          // recipient address
+      uint256 _value,       // value in wei
+      uint256 _fees,        // fees in wei
       bool _disputed
   ) private {
     uint256 value = _value.sub(_fees);  // can be zero fees.
@@ -832,14 +832,14 @@ contract MEXConomy is Destructible {
   }
 
   function doConvertTokens(
-    ERC20 _fromToken,     // from token
-    uint8 _fromDecimals,  // decimals for from token
-    ERC20 _toToken,       // to token
-    uint8 _toDecimals,    // decimals for to token
-    address _to,          // send to address
-    uint256 _value,       // value in wei
-    uint256 _fees,        // fees in wei
-    uint256 _rate         // rate of _toToken in cents
+    ERC20 _fromToken,       // from token
+    uint8 _fromDecimals,    // decimals for from token
+    ERC20 _toToken,         // to token
+    uint8 _toDecimals,      // decimals for to token
+    address _to,            // send to address
+    uint256 _value,         // value in wei
+    uint256 _fees,          // fees in wei
+    uint256 _rate           // rate of _toToken in cents
   ) internal {
     // calculate the conversion rate
     //
@@ -860,6 +860,9 @@ contract MEXConomy is Destructible {
 
     // transfer all tokens to us.
     assert(_fromToken.transferFrom(_to, address(this), _value));
+
+    // transfer the fees
+    assert(_fromToken.transfer(feesWallet_, _fees));
 
     // transfer the token
     assert(_toToken.transfer(_to, converted));
