@@ -216,6 +216,7 @@ contract MEXConomy is Destructible {
   address feesWallet_;
   uint32  cancellationMinimumTime_;
   MintableToken mxToken_ = MintableToken(address(0));
+  MintableToken mexcToken_ = MintableToken(address(0));
 
   // events
   event Created(bytes32 _tradeHash);
@@ -227,6 +228,7 @@ contract MEXConomy is Destructible {
   event DisputeResolved(bytes32 _tradeHash);
   event Transfer(address _to, uint256 _value);
   event MintMXTokens(address _to, uint256 _value);
+  event DeferredMEXCTokens(address _to, uint256 _value);
   event Fees(uint256 _fees);
 
   // structs
@@ -252,6 +254,11 @@ contract MEXConomy is Destructible {
     _;
   }
 
+  modifier mexcTokenIsSet() {
+    require(mexcToken_ != MintableToken(address(0)));
+    _;
+  }
+
   // constructor
   function MEXConomy () public {
     arbitrators[msg.sender] = true;
@@ -267,6 +274,11 @@ contract MEXConomy is Destructible {
   function setMXToken(address _addr) public onlyOwner {
     require(_addr != address(0));
     mxToken_ = MintableToken(_addr);
+  }
+
+  function setMEXCToken(address _addr) public onlyOwner {
+    require(_addr != address(0));
+    mexcToken_ = MintableToken(_addr);
   }
 
   function addArbitrator(address _newArbitrator) public onlyOwner {
@@ -362,6 +374,60 @@ contract MEXConomy is Destructible {
   /****************************************************************************/
 
   /**
+   * Transfer MEXC from this address to recipient
+   */
+  function transferMEXC(address _to, uint256 _value) onlyOwner external {
+    require(mexcToken_.balanceOf(address(this)) >= _value);
+    assert(mexcToken_.transfer(_to, _value));
+    Transfer(_to, _value);
+  }
+
+  /**
+   * Transfer MX from this address to recipient
+   */
+  function transferMX(address _to, uint256 _value) onlyOwner external {
+    require(mxToken_.balanceOf(address(this)) >= _value);
+    assert(mxToken_.transfer(_to, _value));
+    Transfer(_to, _value);
+  }
+
+  /**
+   * This function converts MEXC to MX directly without going through the
+   * escrow Smart Contract as it is user driven.
+   */
+  function convertMEXCtoMX(
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate           // MEXC rate at the creation time
+  ) payable mxTokenIsSet external {
+    require(
+        _value > 0 &&
+        _fees > 0 &&
+        _rate > 0 &&
+        mexcToken_.allowance(msg.sender, address(this)) >= _value
+    );
+    doConvertMEXCtoMX(msg.sender, _value, _fees, _rate);
+  }
+
+  /**
+   * This function converts MEXC to MX directly without going through the
+   * escrow Smart Contract as it is user driven.
+   */
+  function convertMXtoMEXC(
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate           // MEXC rate at the creation time
+  ) payable mexcTokenIsSet external {
+    require(
+        _value > 0 &&
+        _fees > 0 &&
+        _rate > 0 &&
+        mxToken_.allowance(msg.sender, address(this)) >= _value
+    );
+    doConvertMXtoMEXC(msg.sender, _value, _fees, _rate);
+  }
+
+  /**
    * External function to be invoked by another contract where the
    * information shall be supplied.
    */
@@ -378,7 +444,7 @@ contract MEXConomy is Destructible {
   ) payable external returns (bytes32) {
 
     // call this first --> _token.approve(address(this), _value);
-    require(_token.allowance(_seller, address(this)) == _value);
+    require(_token.allowance(_seller, address(this)) >= _value);
     _token.safeTransferFrom(_seller, address(this), _value);
 
     bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fees, _rate);
@@ -755,7 +821,7 @@ contract MEXConomy is Destructible {
     uint256 _fees,          // fees in ETH
     uint256 _rate,          // exchange rate for MEXC
     bool _disputed
-  ) private mxTokenIsSet {
+  ) internal mxTokenIsSet {
 
     uint256 value = _value.sub(_fees);  // can be zero fees.
 
@@ -786,8 +852,48 @@ contract MEXConomy is Destructible {
         Transfer(_to, value);
       }
     }
-
   }
 
+  function doConvertMEXCtoMX(
+    address _from,      // the sender
+    uint256 _value,     // values + fees
+    uint256 _fees,      // fees
+    uint256 _rate       // rate of MEXC in cents
+  ) internal {
+    // transfer the token.
+    assert(mexcToken_.transferFrom(_from, address(this), _value));
+    uint256 minted = _value.sub(_fees).mul(_rate).div(100);
+
+    // check if we have enough MX here.
+    if (mxToken_.balanceOf(address(this)) >= minted) {
+      assert(mxToken_.transfer(address(this), minted));
+      Transfer(address(this), minted);
+    } else {
+      // mint the MX tokens
+      mxToken_.mint(_from, minted);
+      MintMXTokens(_from, minted);
+    }
+  }
+
+  function doConvertMXtoMEXC(
+    address _from,      // the sender
+    uint256 _value,     // values + fees
+    uint256 _fees,      // fees
+    uint256 _rate       // rate of MEXC in cents
+  ) internal {
+    // transfer the token.
+    assert(mxToken_.transferFrom(_from, address(this), _value));
+    uint256 converted = _value.sub(_fees).mul(_rate).div(100);
+
+    // check if we have enough MEXC here.
+    if (mexcToken_.balanceOf(address(this)) >= converted) {
+      assert(mexcToken_.transfer(address(this), converted));
+      Transfer(address(this), converted);
+    } else {
+      // take from feesWallet_. Pray that we have enough MEXC there :-)
+      // this should be monitored, and execute on event.
+      DeferredMEXCTokens(_from, converted);
+    }
+  }
 
 }
