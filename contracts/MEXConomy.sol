@@ -228,7 +228,6 @@ contract MEXConomy is Destructible {
   event DisputeResolved(bytes32 _tradeHash);
   event Transfer(address _to, uint256 _value);
   event MintMXTokens(address _to, uint256 _value);
-  event DeferredMEXCTokens(address _to, uint256 _value);
   event Fees(uint256 _fees);
 
   // structs
