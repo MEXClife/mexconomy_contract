@@ -52,9 +52,9 @@ contract('MEXConomy Tests', (accounts) => {
     let acc2Bal1 = await web3.eth.getBalance(acc2);
     console.log('');
     console.log('  +--------------------- beginning balance ---------------------+');
-    console.log('  | fees balance:', feesCollected.toString('10'), '\t\t\t|');
-    console.log('  | acc1 balance:', acc1Bal1.toString('10'), '\t\t\t        |');
-    console.log('  | acc2 balance:', acc2Bal1.toString('10'), '\t\t\t|');
+    console.log('  | fees balance:', feesCollected.toString('10'));
+    console.log('  | acc1 balance:', acc1Bal1.toString('10'));
+    console.log('  | acc2 balance:', acc2Bal1.toString('10'));
     console.log('  +-------------------------------------------------------------+');
   });
 
@@ -63,9 +63,9 @@ contract('MEXConomy Tests', (accounts) => {
     let acc1Bal1 = await web3.eth.getBalance(acc1);
     let acc2Bal1 = await web3.eth.getBalance(acc2);
     console.log('  +----------------------- ending balance ----------------------+');
-    console.log('  | fees balance:', feesCollected.toString('10'), '\t\t\t|');
-    console.log('  | acc1 balance:', acc1Bal1.toString('10'), '\t\t\t        |');
-    console.log('  | acc2 balance:', acc2Bal1.toString('10'), '\t\t\t|');
+    console.log('  | fees balance:', feesCollected.toString('10'));
+    console.log('  | acc1 balance:', acc1Bal1.toString('10'));
+    console.log('  | acc2 balance:', acc2Bal1.toString('10'));
     console.log('  +-------------------------------------------------------------+');
     console.log('');
   });
@@ -172,7 +172,8 @@ contract('MEXConomy Tests', (accounts) => {
     console.log('  ** ----------- previous bal ------------- **');
     console.log('  ** acc1 balance:', bal.toString('10'), '   **');
     console.log('  ** -------------------------------------- **');
-    assert.equal(resp.logs[1].event, 'Released', 'Escrow is released');
+    assert.equal(resp.logs[2].event, 'Released', 'Escrow is released');
+    assert.equal(resp.logs[1].event, 'Fees', 'Seller fees are deducted');
     assert.equal(resp.logs[0].event, 'Transfer', 'Ether is transferred to buyer');
   });
 

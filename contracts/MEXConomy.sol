@@ -444,7 +444,7 @@ contract MEXConomy is Destructible {
   ) private returns (bool) {
     var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
     if (!escrow.exists) return false;
-    transferMinusFees(_buyer, _value, _fees);
+    transferMinusFees(_buyer, _value, _fees, false);
     delete escrows[tradeHash];
     Released(tradeHash);
     return true;
@@ -463,9 +463,9 @@ contract MEXConomy is Destructible {
 
     // see who won.
     if (_buyerWins) {
-      transferMinusFees(_buyer, _value, _fees);
+      transferMinusFees(_buyer, _value, _fees, true);
     } else {
-      transferMinusFees(_seller, _value, 0);
+      transferMinusFees(_seller, _value, 0, true);
     }
 
     delete escrows[tradeHash];
@@ -502,7 +502,7 @@ contract MEXConomy is Destructible {
     // delete the escrow record
     delete escrows[tradeHash];
     CancelledByBuyer(tradeHash);
-    transferMinusFees(_seller, _value, 0);
+    transferMinusFees(_seller, _value, 0, false);
     return true;
   }
 
@@ -523,7 +523,7 @@ contract MEXConomy is Destructible {
     delete escrows[tradeHash];
     CancelledBySeller(tradeHash);
 
-    transferMinusFees(_seller, _value, 0);
+    transferMinusFees(_seller, _value, 0, false);
 
     return true;
   }
@@ -576,15 +576,22 @@ contract MEXConomy is Destructible {
   function transferMinusFees(
       address _to,      // recipient address
       uint256 _value,   // value in ETH
-      uint256 _fees     // fees in ETH
+      uint256 _fees,    // fees in ETH
+      bool _disputed
   ) private {
     uint256 value = _value.sub(_fees);  // can be zero fees.
-    _to.transfer(value);
-    Transfer(_to, value);
 
-    if (_fees > 0) {
+    if (_fees != 0 || _disputed) {
+      // Successful trade. Transfer minus fees
+      _to.transfer(value);
+      Transfer(_to, value);
+
       feesWallet_.transfer(_fees);
       Fees(_fees);
+    } else {
+      // Don't take the fees
+      _to.transfer(_value);
+      Transfer(_to, _value);
     }
   }
 
@@ -603,7 +610,7 @@ contract MEXConomy is Destructible {
   ) private mxTokenIsSet returns (bool) {
     var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
-    revertOrMintTokens(_token, _buyer, _value, _fees, _rate);
+    revertOrMintTokens(_token, _buyer, _value, _fees, _rate, false);
     delete escrows[tradeHash];
     Released(tradeHash);
     return true;
@@ -624,9 +631,9 @@ contract MEXConomy is Destructible {
 
     // see who won.
     if (_buyerWins) {
-      revertOrMintTokens(_token, _buyer, _value, _fees, _rate);
+      revertOrMintTokens(_token, _buyer, _value, _fees, _rate, true);
     } else {
-      revertOrMintTokens(_token, _seller, _value, 0, _rate);
+      revertOrMintTokens(_token, _seller, _value, _fees, _rate, true);
     }
 
     delete escrows[tradeHash];
@@ -666,7 +673,7 @@ contract MEXConomy is Destructible {
     // delete the escrow record
     delete escrows[tradeHash];
     CancelledByBuyer(tradeHash);
-    revertOrMintTokens(_token, _seller, _value, 0, _rate);
+    revertOrMintTokens(_token, _seller, _value, 0, _rate, false);
     return true;
   }
 
@@ -689,7 +696,7 @@ contract MEXConomy is Destructible {
     delete escrows[tradeHash];
     CancelledBySeller(tradeHash);
 
-    revertOrMintTokens(_token, _seller, _value, 0, _rate);
+    revertOrMintTokens(_token, _seller, _value, 0, _rate, false);
 
     return true;
   }
@@ -746,7 +753,8 @@ contract MEXConomy is Destructible {
     address _to,            // recipient address
     uint256 _value,         // value in ETH
     uint256 _fees,          // fees in ETH
-    uint256 _rate           // exchange rate for MEXC
+    uint256 _rate,          // exchange rate for MEXC
+    bool _disputed
   ) private mxTokenIsSet {
 
     uint256 value = _value.sub(_fees);  // can be zero fees.
@@ -763,13 +771,20 @@ contract MEXConomy is Destructible {
       MintMXTokens(_to, minted);
 
     } else {
-      // return back the tokens to the _to address.
-      assert(_token.transfer(_to, value));
-      Transfer(_to, value);
+      // when fees is zero. Check for disputed
+      if (_disputed) {
+        // return back the tokens to the _to address.
+        assert(_token.transfer(_to, value));
+        Transfer(_to, value);
 
-      // take the fees
-      assert(_token.transfer(feesWallet_, _fees));
-      Fees(_fees);
+        // take the fees
+        assert(_token.transfer(feesWallet_, _fees));
+        Fees(_fees);
+      } else {
+        // return all the tokens back.
+        assert(_token.transfer(_to, _value));
+        Transfer(_to, value);
+      }
     }
 
   }
