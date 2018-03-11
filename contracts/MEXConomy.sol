@@ -848,12 +848,12 @@ contract MEXConomy is Destructible {
 
     if (_fromDecimals > _toDecimals) {
       diff = _fromDecimals - _toDecimals;
-      converted = converted / (10 ** diff);
+      converted = converted.div(10 ** diff);
     }
 
     if (_fromDecimals < _toDecimals) {
       diff = _toDecimals - _fromDecimals;
-      converted = converted * (10 ** diff);
+      converted = converted.mul(10 ** diff);
     }
 
     require(_toToken.balanceOf(address(this)) >= converted);
