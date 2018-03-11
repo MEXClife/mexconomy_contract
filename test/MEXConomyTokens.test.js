@@ -126,7 +126,7 @@ contract('MEXConomy Tokens Tests', (accounts) => {
     let value = web3.toWei(amt * 1.04, 'ether');
     let expiry = 2 * 60 * 60 * 1000;  // 2 hours
     let tid = tradeId++;
-    let rate = 2;
+    let rate = 100; // 1 dollar
 
     // approve the fund first
     let resp = await mexc.approve(escrow.address, value, { from: acc1 });
@@ -146,7 +146,7 @@ contract('MEXConomy Tokens Tests', (accounts) => {
     let value = web3.toWei(amt * 1.04, 'ether');
     let expiry = 2 * 60 * 60 * 1000;  // 2 hours
     let tid = tradeId++;
-    let rate = 2;
+    let rate = 50; // 50 cents
 
     // approve the fund first
     let resp = await mexc.approve(escrow.address, value, { from: acc1 });
@@ -166,7 +166,7 @@ contract('MEXConomy Tokens Tests', (accounts) => {
     let value = web3.toWei(amt * 1.04, 'ether');
     let expiry = 2 * 60 * 60 * 1000;  // 2 hours
     let tid = tradeId++;
-    let rate = 2;
+    let rate = 200; // 200 cents
 
     // approve the fund first
     let resp = await mexc.approve(escrow.address, value, { from: acc1 });

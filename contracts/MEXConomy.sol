@@ -764,8 +764,8 @@ contract MEXConomy is Destructible {
       assert(_token.transfer(feesWallet_, _value));
       Transfer(feesWallet_, _value);
 
-      // mint MX tokens for this user.
-      uint256 minted = value.mul(_rate);
+      // mint MX tokens for this user. Rate is in cents
+      uint256 minted = value.mul(_rate).div(100);
 
       mxToken_.mint(_to, minted);
       MintMXTokens(_to, minted);
