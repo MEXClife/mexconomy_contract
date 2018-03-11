@@ -79,17 +79,6 @@ contract CanReclaimToken is Ownable {
   }
 }
 
-contract HasNoTokens is CanReclaimToken {
-
-  function tokenFallback(address from_, uint256 value_, bytes data_) pure external {
-    from_;
-    value_;
-    data_;
-    revert();
-  }
-
-}
-
 contract Destructible is Ownable {
   function Destructible() public payable { }
 
@@ -125,18 +114,108 @@ library SafeMath {
   }
 }
 
+contract BasicToken is ERC20Basic {
+  using SafeMath for uint256;
+
+  mapping(address => uint256) balances;
+  uint256 totalSupply_;
+
+  function totalSupply() public view returns (uint256) {
+    return totalSupply_;
+  }
+  function transfer(address _to, uint256 _value) public returns (bool) {
+    require(_to != address(0));
+    require(_value <= balances[msg.sender]);
+
+    // SafeMath.sub will throw if there is not enough balance.
+    balances[msg.sender] = balances[msg.sender].sub(_value);
+    balances[_to] = balances[_to].add(_value);
+    Transfer(msg.sender, _to, _value);
+    return true;
+  }
+  function balanceOf(address _owner) public view returns (uint256 balance) {
+    return balances[_owner];
+  }
+
+}
+
+contract StandardToken is ERC20, BasicToken {
+  mapping (address => mapping (address => uint256)) internal allowed;
+
+  function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+    require(_to != address(0));
+    require(_value <= balances[_from]);
+    require(_value <= allowed[_from][msg.sender]);
+
+    balances[_from] = balances[_from].sub(_value);
+    balances[_to] = balances[_to].add(_value);
+    allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value);
+    Transfer(_from, _to, _value);
+    return true;
+  }
+  function approve(address _spender, uint256 _value) public returns (bool) {
+    allowed[msg.sender][_spender] = _value;
+    Approval(msg.sender, _spender, _value);
+    return true;
+  }
+  function allowance(address _owner, address _spender) public view returns (uint256) {
+    return allowed[_owner][_spender];
+  }
+  function increaseApproval(address _spender, uint _addedValue) public returns (bool) {
+    allowed[msg.sender][_spender] = allowed[msg.sender][_spender].add(_addedValue);
+    Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+    return true;
+  }
+  function decreaseApproval(address _spender, uint _subtractedValue) public returns (bool) {
+    uint oldValue = allowed[msg.sender][_spender];
+    if (_subtractedValue > oldValue) {
+      allowed[msg.sender][_spender] = 0;
+    } else {
+      allowed[msg.sender][_spender] = oldValue.sub(_subtractedValue);
+    }
+    Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+    return true;
+  }
+
+}
+
+contract MintableToken is StandardToken, Ownable {
+  event Mint(address indexed to, uint256 amount);
+  event MintFinished();
+  bool public mintingFinished = false;
+
+  modifier canMint() {
+    require(!mintingFinished);
+    _;
+  }
+  function mint(address _to, uint256 _amount) onlyOwner canMint public returns (bool) {
+    totalSupply_ = totalSupply_.add(_amount);
+    balances[_to] = balances[_to].add(_amount);
+    Mint(_to, _amount);
+    Transfer(address(0), _to, _amount);
+    return true;
+  }
+  function finishMinting() onlyOwner canMint public returns (bool) {
+    mintingFinished = true;
+    MintFinished();
+    return true;
+  }
+}
+
 /**
  * The MEXConomy contract is the smart contract whereby buyers and
  * sellers conggregate and trade among themselves using MEXConomy platform.
  * Special thanks to LocalEthereum for inspiring us to take this further
  * for the community to use.
  */
-contract MEXConomy is HasNoTokens, Destructible {
+contract MEXConomy is Destructible {
   using SafeMath for uint256;
+  using SafeERC20 for ERC20;
 
   // variables
   address feesWallet_;
   uint32  cancellationMinimumTime_;
+  MintableToken mxToken_ = MintableToken(address(0));
 
   // events
   event Created(bytes32 _tradeHash);
@@ -147,6 +226,7 @@ contract MEXConomy is HasNoTokens, Destructible {
   event Released(bytes32 _tradeHash);
   event DisputeResolved(bytes32 _tradeHash);
   event Transfer(address _to, uint256 _value);
+  event MintMXTokens(address _to, uint256 _value);
   event Fees(uint256 _fees);
 
   // structs
@@ -166,6 +246,11 @@ contract MEXConomy is HasNoTokens, Destructible {
     _;
   }
 
+  modifier mxTokenIsSet() {
+    require(mxToken_ != MintableToken(address(0)));
+    _;
+  }
+
   function MEXConomy () public {
     arbitrators[msg.sender] = true;
     feesWallet_ = msg.sender;
@@ -177,6 +262,11 @@ contract MEXConomy is HasNoTokens, Destructible {
   }
 
   // setter and getter functions
+  function setMXToken(address _addr) public onlyOwner {
+    require(_addr != address(0));
+    mxToken_ = MintableToken(_addr);
+  }
+
   function addArbitrator(address _newArbitrator) public onlyOwner {
     require(_newArbitrator != address(0));
     arbitrators[_newArbitrator] = true;
@@ -196,7 +286,7 @@ contract MEXConomy is HasNoTokens, Destructible {
     cancellationMinimumTime_ = _cancelTime;
   }
 
-  // main exported functions
+  // main exported Ether functions
   function releaseEscrow(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees) external returns (bool){
     require(msg.sender == _seller);
     return doReleaseEscrow(_tradeID, _seller, _buyer, _value, _fees);
@@ -221,6 +311,49 @@ contract MEXConomy is HasNoTokens, Destructible {
     require(msg.sender == _seller);
     return doSellerRequestToCancelTrade(_tradeID, _seller, _buyer, _value, _fees);
   }
+
+
+  // main exported token functions
+  function releaseTokenEscrow(
+      ERC20 _token, bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees, uint256 _rate) external returns (bool){
+    require(msg.sender == _seller);
+    return doReleaseTokenEscrow(_token, _tradeID, _seller, _buyer, _value, _fees, _rate);
+  }
+  function resolveTokenDispute(
+      ERC20 _token, bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees, uint256 _rate, bool _buyerWins) onlyArbitrators external returns (bool) {
+    return doResolveTokenTradeDispute(_token, _tradeID, _seller, _buyer, _value, _fees, _rate, _buyerWins);
+  }
+  function disableSellerToCancelTokenTrade(
+      bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees, uint256 _rate) external returns (bool) {
+    // have to add arbitrators here, since maybe first time user doesn't have ether balance.
+    require(msg.sender == _buyer || arbitrators[msg.sender]);
+    return doDisableSellerToCancelTokenTrade(_tradeID, _seller, _buyer, _value, _fees, _rate);
+  }
+  function buyerToCancelTokenTrade(
+      ERC20 _token, bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees, uint256 _rate) external returns (bool) {
+    require(msg.sender == _buyer);
+    return doBuyerToCancelTokenTrade(_token, _tradeID, _seller, _buyer, _value, _fees, _rate);
+  }
+  function sellerToCancelTokenTrade(
+      ERC20 _token, bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees, uint256 _rate) external returns (bool) {
+    require(msg.sender == _seller);
+    return doSellerToCancelTokenTrade(_token, _tradeID, _seller, _buyer, _value, _fees, _rate);
+  }
+  function sellerRequestToCancelTokenTrade(
+      bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees, uint256 _rate) external returns (bool) {
+    require(msg.sender == _seller);
+    return doSellerRequestToCancelTokenTrade(_tradeID, _seller, _buyer, _value, _fees, _rate);
+  }
+
+  /****************************************************************************/
+  /* Ether Functions                                                          */
+  /****************************************************************************/
 
   /**
    * External function to be invoked by another contract where the
@@ -401,5 +534,225 @@ contract MEXConomy is HasNoTokens, Destructible {
       Fees(_fees);
     }
   }
+
+  /****************************************************************************/
+  /* Token Functions                                                          */
+  /****************************************************************************/
+
+  /**
+   * External function to be invoked by another contract where the
+   * information shall be supplied.
+   */
+  function createTokenEscrow(
+    ERC20 _token,           // the token address
+    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
+    address _seller,        // seller's address
+    address _buyer,         // buyer's address
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate,          // MEXC rate at the creation time
+    uint32 _paymentWindow,  // in seconds
+    uint32 _expiry          // in seconds for total time.
+  ) payable external returns (bytes32) {
+
+    // call this first --> _token.approve(address(this), _value);
+    require(_token.allowance(_seller, address(this)) == _value);
+    _token.safeTransferFrom(_seller, address(this), _value);
+
+    bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fees, _rate);
+
+    // do some validations
+    require(!escrows[tradeHash].exists);            // tradeHash is new.
+    require(block.timestamp < _expiry);             // not yet expired
+    uint32 sellerCanCancelAfter = _paymentWindow == 0 ? 1 : uint32(block.timestamp) + _paymentWindow;
+    escrows[tradeHash] = Escrow(true, sellerCanCancelAfter);
+
+    // emit escrow created.
+    Created(tradeHash);
+    return tradeHash;
+  }
+
+  function doReleaseTokenEscrow(
+    ERC20 _token,           // the token address
+    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
+    address _seller,        // seller's address
+    address _buyer,         // buyer's address
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate           // MEXC rate at the creation time
+  ) private mxTokenIsSet returns (bool) {
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    if (!escrow.exists) return false;
+    revertOrMintTokens(_token, _buyer, _value, _fees, _rate);
+    delete escrows[tradeHash];
+    Released(tradeHash);
+    return true;
+  }
+
+  function doResolveTokenTradeDispute(
+    ERC20 _token,           // the token address
+    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
+    address _seller,        // seller's address
+    address _buyer,         // buyer's address
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate,          // MEXC rate at the creation time
+    bool _buyerWins         // whether the dispute wins by buyer or not.
+  ) private returns (bool) {
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    if (!escrow.exists) return false;
+
+    // see who won.
+    if (_buyerWins) {
+      revertOrMintTokens(_token, _buyer, _value, _fees, _rate);
+    } else {
+      revertOrMintTokens(_token, _seller, _value, 0, _rate);
+    }
+
+    delete escrows[tradeHash];
+    Released(tradeHash);
+    return true;
+  }
+
+  function doDisableSellerToCancelTokenTrade(
+    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
+    address _seller,        // seller's address
+    address _buyer,         // buyer's address
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate           // MEXC rate at the creation time
+  ) private returns (bool) {
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    if (!escrow.exists) return false;
+    if (escrow.sellerCanCancelAfter == 0) return false; // already marked under dispute.
+
+    escrows[tradeHash].sellerCanCancelAfter = 0;
+    SellerCancelDisabled(tradeHash);
+    return true;
+  }
+
+  function doBuyerToCancelTokenTrade(
+    ERC20 _token,           // the token address
+    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
+    address _seller,        // seller's address
+    address _buyer,         // buyer's address
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate           // MEXC rate at the creation time
+  ) private returns (bool) {
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    if (!escrow.exists) return false;
+
+    // delete the escrow record
+    delete escrows[tradeHash];
+    CancelledByBuyer(tradeHash);
+    revertOrMintTokens(_token, _seller, _value, 0, _rate);
+    return true;
+  }
+
+  function doSellerToCancelTokenTrade(
+    ERC20 _token,           // the token address
+    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
+    address _seller,        // seller's address
+    address _buyer,         // buyer's address
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate           // MEXC rate at the creation time
+  ) private returns (bool) {
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    if (!escrow.exists) return false;
+
+    // time has lapsed, and not unlimited time.
+    if (escrow.sellerCanCancelAfter <= 1 || escrow.sellerCanCancelAfter > block.timestamp) return false;
+
+    // delete the escrow record
+    delete escrows[tradeHash];
+    CancelledBySeller(tradeHash);
+
+    revertOrMintTokens(_token, _seller, _value, 0, _rate);
+
+    return true;
+  }
+
+  /**
+   * This function is invoked when the seller didn't reveice any confirmation
+   * from the buyer when the cancellation time is set to unlimited.
+   *
+   */
+  function doSellerRequestToCancelTokenTrade(
+    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
+    address _seller,        // seller's address
+    address _buyer,         // buyer's address
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate           // MEXC rate at the creation time
+  ) private returns (bool) {
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    if (!escrow.exists) return false;
+
+    // ensure unlimited time only
+    if (escrow.sellerCanCancelAfter != 1) return false;
+
+    // delete the escrow record
+    escrows[tradeHash].sellerCanCancelAfter = uint32(block.timestamp) + cancellationMinimumTime_;
+
+    // we don't delete the escrow yet. The buyer has to do that.
+    // delete escrows[tradeHash];
+    SellerRequestedCancel(tradeHash);
+
+    // and no transfer yet, until buyer confirms it.
+    // transferMinusFees(_seller, _value, 0);
+    return true;
+  }
+
+  function getTokenEscrowAndTradeHash(
+    /**
+     * Hashes the values and returns the matching escrow object and trade hash.
+     * Returns an empty escrow struct and 0 _tradeHash if not found
+     */
+    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
+    address _seller,        // seller's address
+    address _buyer,         // buyer's address
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate           // MEXC rate at the creation time
+  ) view private returns (Escrow, bytes32) {
+    bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    return (escrows[tradeHash], tradeHash);
+  }
+
+  function revertOrMintTokens(
+    ERC20 _token,           // the token address
+    address _to,            // recipient address
+    uint256 _value,         // value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate           // exchange rate for MEXC
+  ) private mxTokenIsSet {
+
+    uint256 value = _value.sub(_fees);  // can be zero fees.
+
+    if (_fees != 0) {
+      // ok, transfer the tokens, and mint MX Tokens
+      assert(_token.transfer(feesWallet_, _value));
+      Transfer(feesWallet_, _value);
+
+      // mint MX tokens for this user.
+      uint256 minted = value.mul(_rate);
+
+      mxToken_.mint(_to, minted);
+      MintMXTokens(_to, minted);
+
+    } else {
+      // return back the tokens to the _to address.
+      assert(_token.transfer(_to, value));
+      Transfer(_to, value);
+
+      // take the fees
+      assert(_token.transfer(feesWallet_, _fees));
+      Fees(_fees);
+    }
+
+  }
+
 
 }

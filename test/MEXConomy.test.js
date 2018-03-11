@@ -33,7 +33,7 @@ var MEXConomy = artifacts.require('./MEXConomy.sol');
 contract('MEXConomy Tests', (accounts) => {
 
   // disable this test for now.
-  return;
+  // return;
 
   // accounts
   let owner = accounts[0];

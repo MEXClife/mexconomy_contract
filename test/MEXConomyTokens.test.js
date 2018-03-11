@@ -28,11 +28,11 @@ import expectThrow from 'zeppelin-solidity/test/helpers/expectThrow';
 // import assertRevert from 'zeppelin-solidity/test/helpers/assertRevert';
 import increaseTime from 'zeppelin-solidity/test/helpers/increaseTime';
 
-var MEXConomyTokens = artifacts.require('./MEXConomyTokens.sol');
+var MEXConomy = artifacts.require('./MEXConomy.sol');
 var MEXCToken = artifacts.require('./MEXCToken.sol');
 var MXToken = artifacts.require('./MXToken.sol');
 
-contract('MEXConomyTokens Tests', (accounts) => {
+contract('MEXConomy Tokens Tests', (accounts) => {
 
   // disable this test for now.
   // return;
@@ -47,7 +47,7 @@ contract('MEXConomyTokens Tests', (accounts) => {
     // fund the accounts with MEXC
     mx = await MXToken.deployed();
     mexc = await MEXCToken.deployed();
-    escrow = await MEXConomyTokens.deployed();
+    escrow = await MEXConomy.deployed();
 
     mexc.mint(acc1, web3.toWei(1000, 'ether'), { from: owner });
     mexc.mint(acc2, web3.toWei(1000, 'ether'), { from: owner });
@@ -60,7 +60,7 @@ contract('MEXConomyTokens Tests', (accounts) => {
 
   let escrow, mexc, mx, now;
   beforeEach(async () => {
-    escrow = await MEXConomyTokens.deployed();
+    escrow = await MEXConomy.deployed();
     mexc = await MEXCToken.deployed();
     mx = await MXToken.deployed();
     now = web3.eth.getBlock(web3.eth.blockNumber).timestamp;
