@@ -241,6 +241,7 @@ contract MEXConomy is Destructible {
   mapping (bytes32 => Escrow) public escrows;
   mapping (address => bool) public arbitrators;
 
+  // modifiers
   modifier onlyArbitrators() {
     require(arbitrators[msg.sender]);
     _;
@@ -251,17 +252,18 @@ contract MEXConomy is Destructible {
     _;
   }
 
+  // constructor
   function MEXConomy () public {
     arbitrators[msg.sender] = true;
     feesWallet_ = msg.sender;
     cancellationMinimumTime_ = 2 hours;  // ample time I think.
   }
 
+  // setter and getter functions
   function feesWallet() public view returns (address) {
     return feesWallet_;
   }
 
-  // setter and getter functions
   function setMXToken(address _addr) public onlyOwner {
     require(_addr != address(0));
     mxToken_ = MintableToken(_addr);
@@ -286,34 +288,112 @@ contract MEXConomy is Destructible {
     cancellationMinimumTime_ = _cancelTime;
   }
 
-  // main exported Ether functions
-  function releaseEscrow(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees) external returns (bool){
+  /****************************************************************************/
+  /* Main Exported Ether Functions                                            */
+  /****************************************************************************/
+
+  /**
+   * External function to be invoked by another contract where the
+   * information shall be supplied.
+   */
+  function createEscrow(
+    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
+    address _seller,        // seller's address
+    address _buyer,         // buyer's address
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint32 _paymentWindow,  // in seconds
+    uint32 _expiry          // in seconds for total time.
+  ) payable external returns (bytes32) {
+    bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fees);
+
+    // do some validations
+    require(!escrows[tradeHash].exists);            // tradeHash is new.
+    require(block.timestamp < _expiry);             // not yet expired
+    require(msg.value == _value && msg.value > 0);  // eth sent > 0
+    uint32 sellerCanCancelAfter = _paymentWindow == 0 ? 1 : uint32(block.timestamp) + _paymentWindow;
+    escrows[tradeHash] = Escrow(true, sellerCanCancelAfter);
+
+    // emit escrow created.
+    Created(tradeHash);
+    return tradeHash;
+  }
+
+  function releaseEscrow(
+      bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees) external returns (bool){
     require(msg.sender == _seller);
     return doReleaseEscrow(_tradeID, _seller, _buyer, _value, _fees);
   }
-  function resolveDispute(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees, bool _buyerWins) onlyArbitrators external returns (bool) {
+  function resolveDispute(
+      bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees, bool _buyerWins) onlyArbitrators external returns (bool) {
     return doResolveTradeDispute(_tradeID, _seller, _buyer, _value, _fees, _buyerWins);
   }
-  function disableSellerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees) external returns (bool) {
+  function disableSellerToCancelTrade(
+      bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees) external returns (bool) {
     // have to add arbitrators here, since maybe first time user doesn't have ether balance.
     require(msg.sender == _buyer || arbitrators[msg.sender]);
     return doDisableSellerToCancelTrade(_tradeID, _seller, _buyer, _value, _fees);
   }
-  function buyerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees) external returns (bool) {
+  function buyerToCancelTrade(
+      bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees) external returns (bool) {
     require(msg.sender == _buyer);
     return doBuyerToCancelTrade(_tradeID, _seller, _buyer, _value, _fees);
   }
-  function sellerToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees) external returns (bool) {
+  function sellerToCancelTrade(
+      bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees) external returns (bool) {
     require(msg.sender == _seller);
     return doSellerToCancelTrade(_tradeID, _seller, _buyer, _value, _fees);
   }
-  function sellerRequestToCancelTrade(bytes32 _tradeID, address _seller, address _buyer, uint256 _value, uint256 _fees) external returns (bool) {
+  function sellerRequestToCancelTrade(
+      bytes32 _tradeID, address _seller, address _buyer,
+      uint256 _value, uint256 _fees) external returns (bool) {
     require(msg.sender == _seller);
     return doSellerRequestToCancelTrade(_tradeID, _seller, _buyer, _value, _fees);
   }
 
 
-  // main exported token functions
+  /****************************************************************************/
+  /* Main Exported Token Functions                                            */
+  /****************************************************************************/
+
+  /**
+   * External function to be invoked by another contract where the
+   * information shall be supplied.
+   */
+  function createTokenEscrow(
+    ERC20 _token,           // the token address
+    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
+    address _seller,        // seller's address
+    address _buyer,         // buyer's address
+    uint256 _value,         // the value in ETH
+    uint256 _fees,          // fees in ETH
+    uint256 _rate,          // MEXC rate at the creation time
+    uint32 _paymentWindow,  // in seconds
+    uint32 _expiry          // in seconds for total time.
+  ) payable external returns (bytes32) {
+
+    // call this first --> _token.approve(address(this), _value);
+    require(_token.allowance(_seller, address(this)) == _value);
+    _token.safeTransferFrom(_seller, address(this), _value);
+
+    bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fees, _rate);
+
+    // do some validations
+    require(!escrows[tradeHash].exists);            // tradeHash is new.
+    require(block.timestamp < _expiry);             // not yet expired
+    uint32 sellerCanCancelAfter = _paymentWindow == 0 ? 1 : uint32(block.timestamp) + _paymentWindow;
+    escrows[tradeHash] = Escrow(true, sellerCanCancelAfter);
+
+    // emit escrow created.
+    Created(tradeHash);
+    return tradeHash;
+  }
+
   function releaseTokenEscrow(
       ERC20 _token, bytes32 _tradeID, address _seller, address _buyer,
       uint256 _value, uint256 _fees, uint256 _rate) external returns (bool){
@@ -354,33 +434,6 @@ contract MEXConomy is Destructible {
   /****************************************************************************/
   /* Ether Functions                                                          */
   /****************************************************************************/
-
-  /**
-   * External function to be invoked by another contract where the
-   * information shall be supplied.
-   */
-  function createEscrow(
-    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
-    address _seller,        // seller's address
-    address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
-    uint32 _paymentWindow,  // in seconds
-    uint32 _expiry          // in seconds for total time.
-  ) payable external returns (bytes32) {
-    bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fees);
-
-    // do some validations
-    require(!escrows[tradeHash].exists);            // tradeHash is new.
-    require(block.timestamp < _expiry);             // not yet expired
-    require(msg.value == _value && msg.value > 0);  // eth sent > 0
-    uint32 sellerCanCancelAfter = _paymentWindow == 0 ? 1 : uint32(block.timestamp) + _paymentWindow;
-    escrows[tradeHash] = Escrow(true, sellerCanCancelAfter);
-
-    // emit escrow created.
-    Created(tradeHash);
-    return tradeHash;
-  }
 
   function doReleaseEscrow(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
@@ -538,39 +591,6 @@ contract MEXConomy is Destructible {
   /****************************************************************************/
   /* Token Functions                                                          */
   /****************************************************************************/
-
-  /**
-   * External function to be invoked by another contract where the
-   * information shall be supplied.
-   */
-  function createTokenEscrow(
-    ERC20 _token,           // the token address
-    bytes32 _tradeID,       // _tradeID generated from MEXConomy.
-    address _seller,        // seller's address
-    address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
-    uint256 _rate,          // MEXC rate at the creation time
-    uint32 _paymentWindow,  // in seconds
-    uint32 _expiry          // in seconds for total time.
-  ) payable external returns (bytes32) {
-
-    // call this first --> _token.approve(address(this), _value);
-    require(_token.allowance(_seller, address(this)) == _value);
-    _token.safeTransferFrom(_seller, address(this), _value);
-
-    bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fees, _rate);
-
-    // do some validations
-    require(!escrows[tradeHash].exists);            // tradeHash is new.
-    require(block.timestamp < _expiry);             // not yet expired
-    uint32 sellerCanCancelAfter = _paymentWindow == 0 ? 1 : uint32(block.timestamp) + _paymentWindow;
-    escrows[tradeHash] = Escrow(true, sellerCanCancelAfter);
-
-    // emit escrow created.
-    Created(tradeHash);
-    return tradeHash;
-  }
 
   function doReleaseTokenEscrow(
     ERC20 _token,           // the token address
