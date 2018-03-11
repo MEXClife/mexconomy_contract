@@ -383,39 +383,26 @@ contract MEXConomy is Destructible {
   }
 
   /**
-   * This function converts MEXC to MX directly without going through the
+   * This function converts between tokens directly without going through the
    * escrow Smart Contract as it is user driven.
+   * This is akin to 'atomic swap'
    */
-  function convertMEXCtoMX(
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
-    uint256 _rate           // MEXC rate at the creation time
-  ) payable mxTokenIsSet mexcTokenIsSet external {
+  function convertTokens(
+    ERC20 _fromToken,     // from token
+    uint8 _fromDecimals,  // decimals for from token
+    ERC20 _toToken,       // to token
+    uint8 _toDecimals,    // decimals for to token
+    uint256 _value,         // the value in wei
+    uint256 _fees,          // fees in wei
+    uint256 _rate           // the rate to _toToken in cents
+  ) payable external {
     require(
         _value > 0 &&
         _fees > 0 &&
         _rate > 0 &&
-        mexcToken_.allowance(msg.sender, address(this)) >= _value
+        _fromToken.allowance(msg.sender, address(this)) >= _value
     );
-    doConvertMEXCtoMX(msg.sender, _value, _fees, _rate);
-  }
-
-  /**
-   * This function converts MEXC to MX directly without going through the
-   * escrow Smart Contract as it is user driven.
-   */
-  function convertMXtoMEXC(
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
-    uint256 _rate           // MEXC rate at the creation time
-  ) payable mxTokenIsSet mexcTokenIsSet external {
-    require(
-        _value > 0 &&
-        _fees > 0 &&
-        _rate > 0 &&
-        mxToken_.allowance(msg.sender, address(this)) >= _value
-    );
-    doConvertMXtoMEXC(msg.sender, _value, _fees, _rate);
+    doConvertTokens(_fromToken, _fromDecimals, _toToken, _toDecimals, msg.sender, _value, _fees, _rate);
   }
 
   /**
@@ -427,8 +414,8 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
+    uint256 _value,         // the value in wei
+    uint256 _fees,          // fees in wei
     uint256 _rate,          // MEXC rate at the creation time
     uint32 _paymentWindow,  // in seconds
     uint32 _expiry          // in seconds for total time.
@@ -496,8 +483,8 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees           // fees in ETH
+    uint256 _value,         // the value in wei
+    uint256 _fees           // fees in wei
   ) private returns (bool) {
     var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
     if (!escrow.exists) return false;
@@ -511,8 +498,8 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
+    uint256 _value,         // the value in wei
+    uint256 _fees,          // fees in wei
     bool _buyerWins         // whether the dispute wins by buyer or not.
   ) private returns (bool) {
     var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
@@ -534,8 +521,8 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees           // fees in ETH
+    uint256 _value,         // the value in wei
+    uint256 _fees           // fees in wei
   ) private returns (bool) {
     var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
     if (!escrow.exists) return false;
@@ -550,8 +537,8 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees           // fees in ETH
+    uint256 _value,         // the value in wei
+    uint256 _fees           // fees in wei
   ) private returns (bool) {
     var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
     if (!escrow.exists) return false;
@@ -567,8 +554,8 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees           // fees in ETH
+    uint256 _value,         // the value in wei
+    uint256 _fees           // fees in wei
   ) private returns (bool) {
     var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
     if (!escrow.exists) return false;
@@ -594,8 +581,8 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees           // fees in ETH
+    uint256 _value,         // the value in wei
+    uint256 _fees           // fees in wei
   ) private returns (bool) {
     var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees);
     if (!escrow.exists) return false;
@@ -632,8 +619,8 @@ contract MEXConomy is Destructible {
 
   function transferMinusFees(
       address _to,      // recipient address
-      uint256 _value,   // value in ETH
-      uint256 _fees,    // fees in ETH
+      uint256 _value,   // value in wei
+      uint256 _fees,    // fees in wei
       bool _disputed
   ) private {
     uint256 value = _value.sub(_fees);  // can be zero fees.
@@ -661,9 +648,9 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
-    uint256 _rate           // MEXC rate at the creation time
+    uint256 _value,         // the value in wei
+    uint256 _fees,          // fees in wei
+    uint256 _rate           // token rate at the creation time
   ) private mxTokenIsSet returns (bool) {
     var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
@@ -678,9 +665,9 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
-    uint256 _rate,          // MEXC rate at the creation time
+    uint256 _value,         // the value in wei
+    uint256 _fees,          // fees in wei
+    uint256 _rate,          // token rate at the creation time
     bool _buyerWins         // whether the dispute wins by buyer or not.
   ) private returns (bool) {
     var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
@@ -702,9 +689,9 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
-    uint256 _rate           // MEXC rate at the creation time
+    uint256 _value,         // the value in wei
+    uint256 _fees,          // fees in wei
+    uint256 _rate           // token rate at the creation time
   ) private returns (bool) {
     var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
@@ -720,9 +707,9 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
-    uint256 _rate           // MEXC rate at the creation time
+    uint256 _value,         // the value in wei
+    uint256 _fees,          // fees in wei
+    uint256 _rate           // token rate at the creation time
   ) private returns (bool) {
     var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
@@ -739,9 +726,9 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
-    uint256 _rate           // MEXC rate at the creation time
+    uint256 _value,         // the value in wei
+    uint256 _fees,          // fees in wei
+    uint256 _rate           // token rate at the creation time
   ) private returns (bool) {
     var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
@@ -767,9 +754,9 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
-    uint256 _rate           // MEXC rate at the creation time
+    uint256 _value,         // the value in wei
+    uint256 _fees,          // fees in wei
+    uint256 _rate           // token rate at the creation time
   ) private returns (bool) {
     var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
@@ -797,9 +784,9 @@ contract MEXConomy is Destructible {
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
-    uint256 _value,         // the value in ETH
-    uint256 _fees,          // fees in ETH
-    uint256 _rate           // MEXC rate at the creation time
+    uint256 _value,         // the value in wei
+    uint256 _fees,          // fees in wei
+    uint256 _rate           // token rate at the creation time
   ) view private returns (Escrow, bytes32) {
     bytes32 tradeHash = keccak256(_tradeID, _seller, _buyer, _value, _fees, _rate);
     return (escrows[tradeHash], tradeHash);
@@ -808,9 +795,9 @@ contract MEXConomy is Destructible {
   function revertOrMintTokens(
     ERC20 _token,           // the token address
     address _to,            // recipient address
-    uint256 _value,         // value in ETH
-    uint256 _fees,          // fees in ETH
-    uint256 _rate,          // exchange rate for MEXC
+    uint256 _value,         // value in wei
+    uint256 _fees,          // fees in wei
+    uint256 _rate,          // token rate at the creation time
     bool _disputed
   ) internal mxTokenIsSet {
 
@@ -845,46 +832,39 @@ contract MEXConomy is Destructible {
     }
   }
 
-  function doConvertMEXCtoMX(
-    address _from,      // the sender
-    uint256 _value,     // values + fees
-    uint256 _fees,      // fees
-    uint256 _rate       // rate of MEXC in cents
+  function doConvertTokens(
+    ERC20 _fromToken,     // from token
+    uint8 _fromDecimals,  // decimals for from token
+    ERC20 _toToken,       // to token
+    uint8 _toDecimals,    // decimals for to token
+    address _to,          // send to address
+    uint256 _value,       // value in wei
+    uint256 _fees,        // fees in wei
+    uint256 _rate         // rate of _toToken in cents
   ) internal {
-    // transfer the token.
-    assert(mexcToken_.transferFrom(_from, address(this), _value));
-    uint256 minted = _value.sub(_fees).mul(_rate).div(100);
-
-    // check if we have enough MX here.
-    if (mxToken_.balanceOf(address(this)) >= minted) {
-      assert(mxToken_.transfer(_from, minted));
-      Transfer(_from, minted);
-    } else {
-      // mint the MX tokens
-      mxToken_.mint(_from, minted);
-      MintMXTokens(_from, minted);
-    }
-  }
-
-  function doConvertMXtoMEXC(
-    address _from,      // the sender
-    uint256 _value,     // values + fees
-    uint256 _fees,      // fees
-    uint256 _rate       // rate of MEXC in cents
-  ) internal {
-    // transfer the token.
-    assert(mxToken_.transferFrom(_from, address(this), _value));
+    // calculate the conversion rate
+    //
     uint256 converted = _value.sub(_fees).mul(_rate).div(100);
+    uint256 diff;
 
-    // check if we have enough MEXC here.
-    if (mexcToken_.balanceOf(address(this)) >= converted) {
-      assert(mexcToken_.transfer(_from, converted));
-      Transfer(_from, converted);
-    } else {
-      // take from feesWallet_. Pray that we have enough MEXC there :-)
-      // this should be monitored, and execute on event.
-      DeferredMEXCTokens(_from, converted);
+    if (_fromDecimals > _toDecimals) {
+      diff = _fromDecimals - _toDecimals;
+      converted = converted / (10 ** diff);
     }
+
+    if (_fromDecimals < _toDecimals) {
+      diff = _toDecimals - _fromDecimals;
+      converted = converted * (10 ** diff);
+    }
+
+    require(_toToken.balanceOf(address(this)) >= converted);
+
+    // transfer all tokens to us.
+    assert(_fromToken.transferFrom(_to, address(this), _value));
+
+    // transfer the token
+    assert(_toToken.transfer(_to, converted));
+    Transfer(_to, converted);
   }
 
 }

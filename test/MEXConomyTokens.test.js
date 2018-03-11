@@ -199,7 +199,7 @@ contract('MEXConomy Tokens Tests', (accounts) => {
     let rate = 50; // 0.50 cents
 
     await mexc.approve(escrow.address, value, { from: acc2 });
-    await escrow.convertMEXCtoMX(value, fees, rate, { from: acc2 });
+    await escrow.convertTokens(mexc.address, 18, mx.address, 18, value, fees, rate, { from: acc2 });
 
     let bal2 = await mx.balanceOf(acc2);
     let add2 = web3.toWei(20, 'ether');
@@ -223,7 +223,7 @@ contract('MEXConomy Tokens Tests', (accounts) => {
     let rate = 50; // 0.50 cents
 
     await mx.approve(escrow.address, value, { from: acc2 });
-    await escrow.convertMXtoMEXC(value, fees, rate, { from: acc2 });
+    await escrow.convertTokens(mx.address, 18, mexc.address, 18, value, fees, rate, { from: acc2 });
 
     let bal2 = await mexc.balanceOf(acc2);
     let add2 = web3.toWei(20, 'ether');
