@@ -49,11 +49,18 @@ contract('MEXConomy Tokens Tests', (accounts) => {
     mexc = await MEXCToken.deployed();
     escrow = await MEXConomy.deployed();
 
-    mexc.mint(acc1, web3.toWei(1000, 'ether'), { from: owner });
-    mexc.mint(acc2, web3.toWei(1000, 'ether'), { from: owner });
+    mexc.mint(acc1, web3.toWei(50000, 'ether'), { from: owner });
+    mexc.mint(acc2, web3.toWei(50000, 'ether'), { from: owner });
+    mexc.mint(escrow.address, web3.toWei(1000000, 'ether'), { from: owner });
+
+    // some mx
+    mx.mint(acc1, web3.toWei(50000, 'ether'), { from: owner });
+    mx.mint(acc2, web3.toWei(50000, 'ether'), { from: owner });
+    mx.mint(escrow.address, web3.toWei(1000000, 'ether'), { from: owner });
 
     // set the MX address
     await escrow.setMXToken(mx.address, { from: owner });
+    await escrow.setMEXCToken(mexc.address, { from: owner });
     await mx.transferOwnership(escrow.address, { from: owner });
     await escrow.changeFeesWallet(acc3, { from: owner });
   });
@@ -179,6 +186,85 @@ contract('MEXConomy Tokens Tests', (accounts) => {
     resp = await escrow.buyerToCancelTokenTrade(
           mexc.address, tid, acc1, acc2, value, fees, rate, { from: acc2 });
     console.log('buyerToCancelTrade resp: ', resp);
+
+  });
+
+  it('should convert MEXC to MX directly', async () => {
+    let bal1 = await mx.balanceOf(acc2)
+
+    // let's convert 40 MEXC at a price of 0.50 USD. Means, we should get half MX.
+    let amt = 40;
+    let value = web3.toWei(amt * 1.04, 'ether');
+    let fees = web3.toWei(amt * 0.04, 'ether');
+    let rate = 50; // 0.50 cents
+
+    await mexc.approve(escrow.address, value, { from: acc2 });
+    await escrow.convertMEXCtoMX(value, fees, rate, { from: acc2 });
+
+    let bal2 = await mx.balanceOf(acc2);
+    let add2 = web3.toWei(20, 'ether');
+
+    // some conversion
+    let b1 = web3.toBigNumber(bal1),
+        b2 = web3.toBigNumber(bal2),
+        b3 = web3.toBigNumber(add2);
+
+    assert.equal(b1.plus(b3).toString('10'), b2.toString('10'), 'Balance of MX should increase by 20');
+
+  });
+
+  it('should convert MX to MEXC directly', async () => {
+    let bal1 = await mexc.balanceOf(acc2)
+
+    // let's convert 40 MEXC at a price of 0.50 USD. Means, we should get half MX.
+    let amt = 40;
+    let value = web3.toWei(amt * 1.04, 'ether');
+    let fees = web3.toWei(amt * 0.04, 'ether');
+    let rate = 50; // 0.50 cents
+
+    await mx.approve(escrow.address, value, { from: acc2 });
+    await escrow.convertMXtoMEXC(value, fees, rate, { from: acc2 });
+
+    let bal2 = await mexc.balanceOf(acc2);
+    let add2 = web3.toWei(20, 'ether');
+
+    // some conversion
+    let b1 = web3.toBigNumber(bal1),
+        b2 = web3.toBigNumber(bal2),
+        b3 = web3.toBigNumber(add2);
+
+    console.log('b1:', b1.toString('10'));
+    console.log('b2:', b2.toString('10'));
+    console.log('b3:', b3.toString('10'));
+
+    assert.equal(b1.plus(b3).toString('10'), b2.toString('10'), 'Balance of MEXC should increase by 20');
+
+  });
+
+  it('should be able to send MEXC out', async () => {
+    let bal1 = await mexc.balanceOf(acc2),
+        value = web3.toWei(20, 'ether');
+
+    await escrow.transferToken(mexc.address, acc2, value, { from: owner });
+    let bal2 = await mexc.balanceOf(acc2),
+        bal3 = web3.toBigNumber(bal1),
+        bal4 = web3.toBigNumber(value),
+        bal5 = web3.toBigNumber(bal2);
+
+    assert.equal(bal3.plus(bal4).toString('10'), bal5.toString('10'), 'Balance MEXC should increase by 20');
+  });
+
+  it('should be able to send MX out', async () => {
+    let bal1 = await mx.balanceOf(acc2),
+        value = web3.toWei(20, 'ether');
+
+    await escrow.transferToken(mx.address, acc2, value, { from: owner });
+    let bal2 = await mx.balanceOf(acc2),
+        bal3 = web3.toBigNumber(bal1),
+        bal4 = web3.toBigNumber(value),
+        bal5 = web3.toBigNumber(bal2);
+
+    assert.equal(bal3.plus(bal4).toString('10'), bal5.toString('10'), 'Balance MX should increase by 20');
 
   });
 

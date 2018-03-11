@@ -374,20 +374,11 @@ contract MEXConomy is Destructible {
   /****************************************************************************/
 
   /**
-   * Transfer MEXC from this address to recipient
+   * Transfer tokens from this address to recipient
    */
-  function transferMEXC(address _to, uint256 _value) onlyOwner external {
-    require(mexcToken_.balanceOf(address(this)) >= _value);
-    assert(mexcToken_.transfer(_to, _value));
-    Transfer(_to, _value);
-  }
-
-  /**
-   * Transfer MX from this address to recipient
-   */
-  function transferMX(address _to, uint256 _value) onlyOwner external {
-    require(mxToken_.balanceOf(address(this)) >= _value);
-    assert(mxToken_.transfer(_to, _value));
+  function transferToken(ERC20 _token, address _to, uint256 _value) onlyOwner external {
+    require(_token.balanceOf(address(this)) >= _value);
+    assert(_token.transfer(_to, _value));
     Transfer(_to, _value);
   }
 
@@ -399,7 +390,7 @@ contract MEXConomy is Destructible {
     uint256 _value,         // the value in ETH
     uint256 _fees,          // fees in ETH
     uint256 _rate           // MEXC rate at the creation time
-  ) payable mxTokenIsSet external {
+  ) payable mxTokenIsSet mexcTokenIsSet external {
     require(
         _value > 0 &&
         _fees > 0 &&
@@ -417,7 +408,7 @@ contract MEXConomy is Destructible {
     uint256 _value,         // the value in ETH
     uint256 _fees,          // fees in ETH
     uint256 _rate           // MEXC rate at the creation time
-  ) payable mexcTokenIsSet external {
+  ) payable mxTokenIsSet mexcTokenIsSet external {
     require(
         _value > 0 &&
         _fees > 0 &&
@@ -866,8 +857,8 @@ contract MEXConomy is Destructible {
 
     // check if we have enough MX here.
     if (mxToken_.balanceOf(address(this)) >= minted) {
-      assert(mxToken_.transfer(address(this), minted));
-      Transfer(address(this), minted);
+      assert(mxToken_.transfer(_from, minted));
+      Transfer(_from, minted);
     } else {
       // mint the MX tokens
       mxToken_.mint(_from, minted);
@@ -887,8 +878,8 @@ contract MEXConomy is Destructible {
 
     // check if we have enough MEXC here.
     if (mexcToken_.balanceOf(address(this)) >= converted) {
-      assert(mexcToken_.transfer(address(this), converted));
-      Transfer(address(this), converted);
+      assert(mexcToken_.transfer(_from, converted));
+      Transfer(_from, converted);
     } else {
       // take from feesWallet_. Pray that we have enough MEXC there :-)
       // this should be monitored, and execute on event.
