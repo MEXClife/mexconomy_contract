@@ -299,48 +299,48 @@ contract MEXConomyTokens is HasNoEther, Destructible {
   }
 
   // main exported functions
-  function releaseEscrow(
+  function releaseTokenEscrow(
       ERC20 _token, bytes32 _tradeID, address _seller, address _buyer,
       uint256 _value, uint256 _fees, uint256 _rate) external returns (bool){
     require(msg.sender == _seller);
-    return doReleaseEscrow(_token, _tradeID, _seller, _buyer, _value, _fees, _rate);
+    return doReleaseTokenEscrow(_token, _tradeID, _seller, _buyer, _value, _fees, _rate);
   }
-  function resolveDispute(
+  function resolveTokenDispute(
       ERC20 _token, bytes32 _tradeID, address _seller, address _buyer,
       uint256 _value, uint256 _fees, uint256 _rate, bool _buyerWins) onlyArbitrators external returns (bool) {
-    return doResolveTradeDispute(_token, _tradeID, _seller, _buyer, _value, _fees, _rate, _buyerWins);
+    return doResolveTokenTradeDispute(_token, _tradeID, _seller, _buyer, _value, _fees, _rate, _buyerWins);
   }
-  function disableSellerToCancelTrade(
+  function disableSellerToCancelTokenTrade(
       bytes32 _tradeID, address _seller, address _buyer,
       uint256 _value, uint256 _fees, uint256 _rate) external returns (bool) {
     // have to add arbitrators here, since maybe first time user doesn't have ether balance.
     require(msg.sender == _buyer || arbitrators[msg.sender]);
-    return doDisableSellerToCancelTrade(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    return doDisableSellerToCancelTokenTrade(_tradeID, _seller, _buyer, _value, _fees, _rate);
   }
-  function buyerToCancelTrade(
+  function buyerToCancelTokenTrade(
       ERC20 _token, bytes32 _tradeID, address _seller, address _buyer,
       uint256 _value, uint256 _fees, uint256 _rate) external returns (bool) {
     require(msg.sender == _buyer);
-    return doBuyerToCancelTrade(_token, _tradeID, _seller, _buyer, _value, _fees, _rate);
+    return doBuyerToCancelTokenTrade(_token, _tradeID, _seller, _buyer, _value, _fees, _rate);
   }
-  function sellerToCancelTrade(
+  function sellerToCancelTokenTrade(
       ERC20 _token, bytes32 _tradeID, address _seller, address _buyer,
       uint256 _value, uint256 _fees, uint256 _rate) external returns (bool) {
     require(msg.sender == _seller);
-    return doSellerToCancelTrade(_token, _tradeID, _seller, _buyer, _value, _fees, _rate);
+    return doSellerToCancelTokenTrade(_token, _tradeID, _seller, _buyer, _value, _fees, _rate);
   }
-  function sellerRequestToCancelTrade(
+  function sellerRequestToCancelTokenTrade(
       bytes32 _tradeID, address _seller, address _buyer,
       uint256 _value, uint256 _fees, uint256 _rate) external returns (bool) {
     require(msg.sender == _seller);
-    return doSellerRequestToCancelTrade(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    return doSellerRequestToCancelTokenTrade(_tradeID, _seller, _buyer, _value, _fees, _rate);
   }
 
   /**
    * External function to be invoked by another contract where the
    * information shall be supplied.
    */
-  function createEscrow(
+  function createTokenEscrow(
     ERC20 _token,           // the token address
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
@@ -369,7 +369,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     return tradeHash;
   }
 
-  function doReleaseEscrow(
+  function doReleaseTokenEscrow(
     ERC20 _token,           // the token address
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
@@ -378,7 +378,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     uint256 _fees,          // fees in ETH
     uint256 _rate           // MEXC rate at the creation time
   ) private mxTokenIsSet returns (bool) {
-    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
     revertOrMintTokens(_token, _buyer, _value, _fees, _rate);
     delete escrows[tradeHash];
@@ -386,7 +386,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     return true;
   }
 
-  function doResolveTradeDispute(
+  function doResolveTokenTradeDispute(
     ERC20 _token,           // the token address
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
@@ -396,7 +396,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     uint256 _rate,          // MEXC rate at the creation time
     bool _buyerWins         // whether the dispute wins by buyer or not.
   ) private returns (bool) {
-    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
 
     // see who won.
@@ -411,7 +411,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     return true;
   }
 
-  function doDisableSellerToCancelTrade(
+  function doDisableSellerToCancelTokenTrade(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
@@ -419,7 +419,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     uint256 _fees,          // fees in ETH
     uint256 _rate           // MEXC rate at the creation time
   ) private returns (bool) {
-    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
     if (escrow.sellerCanCancelAfter == 0) return false; // already marked under dispute.
 
@@ -428,7 +428,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     return true;
   }
 
-  function doBuyerToCancelTrade(
+  function doBuyerToCancelTokenTrade(
     ERC20 _token,           // the token address
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
@@ -437,7 +437,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     uint256 _fees,          // fees in ETH
     uint256 _rate           // MEXC rate at the creation time
   ) private returns (bool) {
-    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
 
     // delete the escrow record
@@ -447,7 +447,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     return true;
   }
 
-  function doSellerToCancelTrade(
+  function doSellerToCancelTokenTrade(
     ERC20 _token,           // the token address
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
@@ -456,7 +456,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     uint256 _fees,          // fees in ETH
     uint256 _rate           // MEXC rate at the creation time
   ) private returns (bool) {
-    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
 
     // time has lapsed, and not unlimited time.
@@ -476,7 +476,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
    * from the buyer when the cancellation time is set to unlimited.
    *
    */
-  function doSellerRequestToCancelTrade(
+  function doSellerRequestToCancelTokenTrade(
     bytes32 _tradeID,       // _tradeID generated from MEXConomy.
     address _seller,        // seller's address
     address _buyer,         // buyer's address
@@ -484,7 +484,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     uint256 _fees,          // fees in ETH
     uint256 _rate           // MEXC rate at the creation time
   ) private returns (bool) {
-    var (escrow, tradeHash) = getEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
+    var (escrow, tradeHash) = getTokenEscrowAndTradeHash(_tradeID, _seller, _buyer, _value, _fees, _rate);
     if (!escrow.exists) return false;
 
     // ensure unlimited time only
@@ -502,7 +502,7 @@ contract MEXConomyTokens is HasNoEther, Destructible {
     return true;
   }
 
-  function getEscrowAndTradeHash(
+  function getTokenEscrowAndTradeHash(
     /**
      * Hashes the values and returns the matching escrow object and trade hash.
      * Returns an empty escrow struct and 0 _tradeHash if not found
